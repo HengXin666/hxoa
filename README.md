@@ -10,7 +10,7 @@ hxoa 把本地工作区映射给 hark, 让它能像操作本地文件一样查�
 - 源码完全公开, 你可以自己 clone 下来逐行核对再编译, 不需要相信任何预编译产物.
 - 客户端本身不持有任何工作区内容, 也不缓存文件, 每次查看都是实时映射.
 - 连接需要一个一次性令牌, 令牌只绑定当前会话, 换一个会话就要重新连接.
-- 读写设计, 客户端可以列出, 读取, 写入工作区文件, 并在工作区里执行命令. 笔记只写在你本机的客户端目录, 不经过网络.
+- 读写设计, 客户端可以列出, 按范围读取, 局部写入工作区文件. 笔记只写在你本机的客户端目录, 不经过网络.
 - 域名和令牌都可以配置, 不写死在任何地方, 换一个环境就能重新指过去.
 
 ## 从源码构建
@@ -35,9 +35,10 @@ GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o hxoa-linux-ar
 ```bash
 hxoa login <token> --base <url>   连接工作区, 也可以设 HARK_BASE 环境变量
 hxoa ls [path]                    列出目录
-hxoa cat <path>                   打印文件
+hxoa cat <path> [start] [end]     打印文件, 可只打印 start 到 end 行
 hxoa put <path>                   把标准输入写入工作区文件
-hxoa exec <command>               在工作区里执行命令
+hxoa patch <path> <start> <end> <version>
+                                  用标准输入替换文件的指定行(1-based 含端点)
 hxoa git <command>                git 查询 (status/log/show/diff 等)
 hxoa root                         打印工作区根目录
 hxoa note <file>                  把笔记存到本机客户端目录

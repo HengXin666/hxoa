@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -14,6 +15,7 @@ const (
 	fsPrefix    = "/fs"
 	noteFile    = "note.md"
 	contentType = "text/plain; charset=utf-8"
+	replaceOp   = "replace_lines"
 )
 
 type entry struct {
@@ -46,7 +48,46 @@ func fsCat(doc *config, args []string) int {
 	if len(args) < 1 {
 		return usage("cat needs a path")
 	}
-	got, err := call(doc, "GET", fsPrefix+"/"+strings.TrimPrefix(args[0], "/"), nil, "")
+	path := fsPrefix + "/" + strings.TrimPrefix(args[0], "/")
+	if len(args) > 1 {
+		span := "?start=" + args[1]
+		if len(args) > 2 {
+			span += "&end=" + args[2]
+		}
+		path += span
+	}
+	got, err := call(doc, "GET", path, nil, "")
+	if err != nil {
+		return fail(err)
+	}
+	_, _ = os.Stdout.Write(got.body)
+	return 0
+}
+
+func fsPatch(doc *config, args []string) int {
+	if len(args) < 4 {
+		return usage("patch needs a path, start, end and version")
+	}
+	start, err1 := strconv.Atoi(args[1])
+	end, err2 := strconv.Atoi(args[2])
+	if err1 != nil || err2 != nil || start < 1 || end < start {
+		return usage("patch needs 1-based start and end with end >= start")
+	}
+	raw, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return fail(err)
+	}
+	text := strings.TrimRight(string(raw), "\n")
+	var lines []string
+	if text != "" {
+		lines = strings.Split(text, "\n")
+	}
+	payload, _ := json.Marshal(map[string]any{
+		"op": replaceOp, "start": start, "end": end,
+		"lines": lines, "if_match": args[3],
+	})
+	path := fsPrefix + "/" + strings.TrimPrefix(args[0], "/")
+	got, err := call(doc, "PATCH", path, payload, "application/json")
 	if err != nil {
 		return fail(err)
 	}
@@ -77,25 +118,6 @@ func fsPut(doc *config, args []string) int {
 	}
 	path := fsPrefix + "/" + strings.TrimPrefix(args[0], "/")
 	got, err := call(doc, "PUT", path, raw, contentType)
-	if err != nil {
-		return fail(err)
-	}
-	_, _ = os.Stdout.Write(got.body)
-	return 0
-}
-
-func fsExec(doc *config, args []string) int {
-	if len(args) < 1 {
-		return usage("exec needs a command")
-	}
-	cwd := "/"
-	if len(doc.Roots) > 0 {
-		cwd = doc.Roots[0]
-	}
-	payload, _ := json.Marshal(map[string]string{
-		"cwd": cwd, "command": strings.Join(args, " "),
-	})
-	got, err := call(doc, "POST", fsPrefix+"/exec", payload, "application/json")
 	if err != nil {
 		return fail(err)
 	}
