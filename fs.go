@@ -4,8 +4,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
+	"io"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -59,6 +60,42 @@ func fsGit(doc *config, args []string) int {
 	}
 	payload, _ := json.Marshal(map[string]any{"args": args})
 	got, err := call(doc, "POST", fsPrefix+"/git", payload, "application/json")
+	if err != nil {
+		return fail(err)
+	}
+	_, _ = os.Stdout.Write(got.body)
+	return 0
+}
+
+func fsPut(doc *config, args []string) int {
+	if len(args) < 1 {
+		return usage("put needs a path")
+	}
+	raw, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return fail(err)
+	}
+	path := fsPrefix + "/" + strings.TrimPrefix(args[0], "/")
+	got, err := call(doc, "PUT", path, raw, contentType)
+	if err != nil {
+		return fail(err)
+	}
+	_, _ = os.Stdout.Write(got.body)
+	return 0
+}
+
+func fsExec(doc *config, args []string) int {
+	if len(args) < 1 {
+		return usage("exec needs a command")
+	}
+	cwd := "/"
+	if len(doc.Roots) > 0 {
+		cwd = doc.Roots[0]
+	}
+	payload, _ := json.Marshal(map[string]string{
+		"cwd": cwd, "command": strings.Join(args, " "),
+	})
+	got, err := call(doc, "POST", fsPrefix+"/exec", payload, "application/json")
 	if err != nil {
 		return fail(err)
 	}

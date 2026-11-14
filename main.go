@@ -23,6 +23,10 @@ func main() {
 		os.Exit(withConfig(func(doc *config) int { return fsList(doc, args[1:]) }))
 	case "cat":
 		os.Exit(withConfig(func(doc *config) int { return fsCat(doc, args[1:]) }))
+	case "put":
+		os.Exit(withConfig(func(doc *config) int { return fsPut(doc, args[1:]) }))
+	case "exec":
+		os.Exit(withConfig(func(doc *config) int { return fsExec(doc, args[1:]) }))
 	case "root":
 		os.Exit(withConfig(fsRoot))
 	case "git":
@@ -81,8 +85,10 @@ func help() {
 	lines := []string{
 		appName + " ls [path]        list a directory",
 		appName + " cat <path>       print a file",
+		appName + " put <path>       write stdin to a file in the workspace",
+		appName + " exec <command>   run a command in the workspace",
 		appName + " root             print the workspace root",
-		appName + " git <command>    read-only git query in the workspace",
+		appName + " git <command>    git query in the workspace",
 		appName + " note <file>      save a note file on this machine",
 		appName + " login <token>    connect with --base <url> or HARK_BASE",
 		"",
