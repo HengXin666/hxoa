@@ -74,6 +74,9 @@ func doLogin(args []string) int {
 		return fail(err)
 	}
 	doc.Base = base
+	if doc.Token == "" {
+		doc.Token = token
+	}
 	if err := saveConfig(&doc); err != nil {
 		return fail(err)
 	}
