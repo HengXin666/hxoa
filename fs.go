@@ -1,4 +1,4 @@
-// Package main: workspace file commands and the local plan note.
+// Package main: workspace file commands and a local note.
 package main
 
 import (
@@ -11,8 +11,7 @@ import (
 
 const (
 	fsPrefix    = "/fs"
-	planDir     = ".hark"
-	planFile    = "plan.md"
+	noteFile    = "note.md"
 	contentType = "text/plain; charset=utf-8"
 )
 
@@ -76,11 +75,11 @@ func fsRoot(doc *config) int {
 	return 0
 }
 
-// fsPlan saves a note as a local file beside the client config. It never sends
+// fsNote saves a note as a local file beside the client config. It never sends
 // anything over the network, so the note stays on this machine only.
-func fsPlan(args []string) int {
+func fsNote(args []string) int {
 	if len(args) < 1 {
-		return usage("plan needs a local file")
+		return usage("note needs a local file")
 	}
 	raw, err := os.ReadFile(args[0])
 	if err != nil {
@@ -90,7 +89,7 @@ func fsPlan(args []string) int {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fail(err)
 	}
-	target := filepath.Join(dir, planFile)
+	target := filepath.Join(dir, noteFile)
 	if err := os.WriteFile(target, raw, 0o600); err != nil {
 		return fail(err)
 	}
