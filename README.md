@@ -39,7 +39,6 @@ hxoa cat <path>                   打印文件
 hxoa git <command>                只读 git 查询 (status/log/show/diff 等)
 hxoa root                         打印工作区根目录
 hxoa note <file>                  把笔记存到本机客户端目录
-hxoa note <file>                  把笔记存到本机客户端目录
 ```
 
 路径都相对于工作区根目录.
