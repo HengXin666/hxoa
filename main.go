@@ -31,6 +31,8 @@ func main() {
 		os.Exit(withConfig(fsRoot))
 	case "git":
 		os.Exit(withConfig(func(doc *config) int { return fsGit(doc, args[1:]) }))
+	case "exec":
+		os.Exit(withConfig(func(doc *config) int { return fsExec(doc, args[1:]) }))
 	case "note":
 		os.Exit(fsNote(args[1:]))
 	default:
@@ -93,6 +95,7 @@ func help() {
 		"                  replace lines in a file from stdin, 1-based inclusive",
 		appName + " root             print the workspace root",
 		appName + " git <command>    git query in the workspace",
+		appName + " exec <command>   run a command in the workspace",
 		appName + " note <file>      save a note file on this machine",
 		appName + " login <token>    connect with --base <url> or HARK_BASE",
 		"",
