@@ -5,12 +5,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 )
 
 // Worker mode: each token works in its own git worktree on branch
-// hxoa/<label>, at <workspace>/.hxoa/workers/<label>. The user's checkout is
+// hxoa/<label>-<token id>, at <workspace>/.hxoa/workers/<label>-<token id>.
+// The id keeps two tokens with the same label (or a label reused after a
+// token was deleted) from sharing a branch. The user's checkout is
 // never touched until they merge from the panel.
 
 var worktreeMu sync.Mutex
@@ -44,10 +47,21 @@ func isGitRepo(dir string) bool {
 	return a == b
 }
 
-func workerBranch(label string) string { return "hxoa/" + label }
+var unsafeRef = regexp.MustCompile(`[^\p{L}\p{N}._-]+`)
 
-func workerDir(ws *Workspace, label string) string {
-	return filepath.Join(ws.Path, ".hxoa", "workers", label)
+// workerKey names a token's branch and worktree: "<label>-<id>".
+func workerKey(t *Token) string {
+	l := strings.Trim(unsafeRef.ReplaceAllString(t.Label, "-"), "-.")
+	if l == "" {
+		l = "worker"
+	}
+	return l + "-" + t.ID
+}
+
+func workerBranch(t *Token) string { return "hxoa/" + workerKey(t) }
+
+func workerDir(ws *Workspace, t *Token) string {
+	return filepath.Join(ws.Path, ".hxoa", "workers", workerKey(t))
 }
 
 func excludeHxoa(ws *Workspace) {
@@ -73,12 +87,12 @@ func excludeHxoa(ws *Workspace) {
 
 // ensureWorker returns the root a token should operate in, creating the
 // worktree on first use.
-func ensureWorker(ws *Workspace, label string) (root, branch, base string, err error) {
+func ensureWorker(ws *Workspace, t *Token) (root, branch, base string, err error) {
 	if !ws.Workers {
 		return ws.Path, "", "", nil
 	}
-	dir := workerDir(ws, label)
-	branch = workerBranch(label)
+	dir := workerDir(ws, t)
+	branch = workerBranch(t)
 	if b, ok := ready.Load(dir); ok {
 		if _, statErr := os.Stat(filepath.Join(dir, ".git")); statErr == nil {
 			return dir, branch, b.(string), nil
@@ -117,9 +131,9 @@ type WorkerStatus struct {
 	BaseRef string   `json:"base"`
 }
 
-func workerStatus(ws *Workspace, label string) WorkerStatus {
-	st := WorkerStatus{Label: label, Branch: workerBranch(label)}
-	dir := workerDir(ws, label)
+func workerStatus(ws *Workspace, t *Token) WorkerStatus {
+	st := WorkerStatus{Label: t.Label, Branch: workerBranch(t)}
+	dir := workerDir(ws, t)
 	if _, err := os.Stat(filepath.Join(dir, ".git")); err != nil {
 		return st
 	}
@@ -142,11 +156,12 @@ func workerStatus(ws *Workspace, label string) WorkerStatus {
 // mergeWorker commits whatever the worker left uncommitted, then merges its
 // branch into the user's current branch. On conflict it aborts and reports,
 // leaving the user's checkout exactly as it was.
-func mergeWorker(ws *Workspace, label string) (string, error) {
+func mergeWorker(ws *Workspace, t *Token) (string, error) {
+	label := t.Label
 	worktreeMu.Lock()
 	defer worktreeMu.Unlock()
-	dir := workerDir(ws, label)
-	branch := workerBranch(label)
+	dir := workerDir(ws, t)
+	branch := workerBranch(t)
 	if _, err := os.Stat(filepath.Join(dir, ".git")); err != nil {
 		return "", errors.New("这个 worker 还没有工作树")
 	}
@@ -175,12 +190,15 @@ func (w *Workspace) Branch() string {
 	return b
 }
 
-func removeWorker(ws *Workspace, label string) {
+func removeWorker(ws *Workspace, t *Token) {
 	worktreeMu.Lock()
 	defer worktreeMu.Unlock()
-	dir := workerDir(ws, label)
+	dir := workerDir(ws, t)
 	ready.Delete(dir)
 	if _, err := os.Stat(dir); err == nil {
 		git(ws.Path, "worktree", "remove", "--force", dir)
 	}
+	// Drop the branch only when everything on it is already merged; `-d`
+	// refuses otherwise, so unmerged work survives the token.
+	git(ws.Path, "branch", "-d", workerBranch(t))
 }

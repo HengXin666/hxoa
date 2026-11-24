@@ -81,7 +81,7 @@ func (s *Server) AdminHandler(static fs.FS) http.Handler {
 				}
 				tv := tokView{Token: t, Online: s.Store.Online(&t)}
 				if w.Workers {
-					st := workerStatus(&w, t.Label)
+					st := workerStatus(&w, &t)
 					tv.Worker = &st
 				}
 				if tv.Online {
@@ -167,11 +167,12 @@ func (s *Server) AdminHandler(static fs.FS) http.Handler {
 		if t != nil {
 			killJobs(t.ID)
 		}
-		// A worker's branch is kept (it may hold unmerged work); its worktree
-		// is dropped only when it has nothing uncommitted.
+		// Deleting a token cleans up its worker: the worktree goes when it has
+		// nothing uncommitted, the branch when it is fully merged. Unmerged
+		// work is kept for the user to deal with.
 		if t != nil && ws != nil && ws.Workers {
-			if st := workerStatus(ws, t.Label); st.Exists && len(st.Dirty) == 0 {
-				removeWorker(ws, t.Label)
+			if st := workerStatus(ws, t); st.Exists && len(st.Dirty) == 0 {
+				removeWorker(ws, t)
 			}
 		}
 		writeJSON(w, 200, map[string]any{"ok": true})
@@ -183,7 +184,7 @@ func (s *Server) AdminHandler(static fs.FS) http.Handler {
 			writeJSON(w, 400, map[string]any{"ok": false, "error": "不是 worker 连接"})
 			return
 		}
-		out, err := mergeWorker(ws, t.Label)
+		out, err := mergeWorker(ws, t)
 		if err != nil {
 			writeJSON(w, 409, map[string]any{"ok": false, "error": err.Error()})
 			return
@@ -258,28 +259,19 @@ func expandHome(p string) string {
 	return p
 }
 
-// Prompt is the text the user pastes to an agent. It is short on purpose: the
-// client's own `hxoa guide` carries the full rules, so they cost tokens once.
+// Prompt is the text the user pastes to an agent. Kept as short as the
+// user's own hand-written prompt: the client prints the rest (mode, branch,
+// exec on/off) on login and carries the full rules in `hxoa guide`.
 func (s *Server) Prompt(ws *Workspace, t *Token) string {
 	base := s.PublicURL()
 	if base == "" {
 		base = "<隧道地址还没就绪>"
 	}
-	var b strings.Builder
-	b.WriteString("请连接我本机的工作区「" + ws.Name + "」, 之后的读写和命令都通过它进行:\n\n")
-	b.WriteString("curl -fsSL -o hxoa https://github.com/HengXin666/hxoa/releases/latest/download/hxoa-linux-$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') && chmod +x hxoa\n")
-	b.WriteString("# 或者从源码: go install github.com/HengXin666/hxoa/cmd/hxoa@latest\n")
-	b.WriteString("./hxoa login " + t.Secret + " --base " + base + "\n")
-	b.WriteString("./hxoa guide   # 用法和规则, 先读一遍\n\n")
-	b.WriteString("你的身份是 " + t.Label + "。")
+	p := "因为本地工作区纯源码就非常大, 无法打包或者让你clone, 而且有未提交的修改, 你必须下载 https://github.com/HengXin666/hxoa 连接我本地工作区, 才能进行后续工作:\n\n" +
+		"hxoa --base " + base + " --login " + t.Secret + "\n" +
+		"装完直接 hxoa ls 就能看到我的文件, 连的是本机这一个工作区"
 	if ws.Workers {
-		b.WriteString("这个工作区开了 workers: 你在自己的 git 工作树里干活 (分支 hxoa/" + t.Label + "), 不会和其他人直接撞车。" +
-			"做完一段就用 hxoa exec 'git add -A && git commit -m ...' 提交, 然后告诉我, 我在面板上点合并。")
-	} else {
-		b.WriteString("你直接编辑我的工作区, 我和本地工具可能同时在改: 每次写入都带上读取时的 version, 冲突就重新读取再改, 不要强制覆盖。")
+		p += "\n\n开了并行编辑: 你在自己的 git 工作树 (分支 " + workerBranch(t) + ") 里改, 做完一段就 commit 并告诉我, 我在面板上合并。"
 	}
-	if !ws.Exec {
-		b.WriteString("这个工作区没开命令执行, 只能读写文件。")
-	}
-	return b.String()
+	return p
 }

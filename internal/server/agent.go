@@ -127,7 +127,7 @@ func (s *Server) AgentHandler() http.Handler {
 				return
 			}
 			c := &reqCtx{tok: tok, ws: ws, secret: secret}
-			root, branch, base, err := ensureWorker(ws, tok.Label)
+			root, branch, base, err := ensureWorker(ws, tok)
 			if err != nil {
 				writeErr(w, err)
 				return
