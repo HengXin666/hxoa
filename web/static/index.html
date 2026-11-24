@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>hxoa 工作区</title>
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--ink:#1d1d1b;--mute:#76746e;--line:#e4e1da;--acc:#2f6b4f;--warn:#b5532a;--on:#2e9e5b}
+*{box-sizing:border-box}body{margin:0;font:14px/1.5 -apple-system,"PingFang SC","Noto Sans CJK SC",sans-serif;background:var(--bg);color:var(--ink)}
+header{display:flex;align-items:center;gap:16px;padding:18px 28px;border-bottom:1px solid var(--line);background:var(--card)}
+header h1{font-size:18px;margin:0}.tun{margin-left:auto;font-size:13px;color:var(--mute)}.tun code{color:var(--ink)}
+main{max-width:1080px;margin:0 auto;padding:24px 20px;display:grid;gap:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+input[type=text],input[type=password]{padding:7px 10px;border:1px solid var(--line);border-radius:6px;font:inherit;min-width:220px}
+button{padding:7px 12px;border:1px solid var(--line);border-radius:6px;background:#fff;font:inherit;cursor:pointer}
+button.pri{background:var(--acc);color:#fff;border-color:var(--acc)}button.danger{color:var(--warn)}
+button:disabled{opacity:.5;cursor:default}
+.ws h2{font-size:16px;margin:0}.path{color:var(--mute);font-family:ui-monospace,monospace;font-size:12px}
+.badge{font-size:12px;padding:2px 8px;border-radius:99px;background:#eef3ef;color:var(--acc)}
+.badge.off{background:#f1efea;color:var(--mute)}
+table{width:100%;border-collapse:collapse;margin-top:10px}td,th{text-align:left;padding:8px 6px;border-top:1px solid var(--line);font-size:13px;vertical-align:top}
+th{color:var(--mute);font-weight:500}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#ccc;margin-right:6px}.dot.on{background:var(--on)}
+.hint{color:var(--mute);font-size:12px}
+.toggle{display:flex;gap:6px;align-items:center;cursor:pointer}
+.picker{border:1px solid var(--line);border-radius:8px;max-height:240px;overflow:auto;margin-top:8px}
+.picker div{padding:5px 10px;cursor:pointer}.picker div:hover{background:#f3f1ec}
+pre{white-space:pre-wrap;background:#f3f1ec;padding:12px;border-radius:8px;font-size:12px;margin:8px 0}
+.ops td{font-family:ui-monospace,monospace;font-size:12px}.err{color:var(--warn)}
+dialog{border:1px solid var(--line);border-radius:10px;max-width:720px;width:92vw}
+</style>
+</head>
+<body>
+<header><h1>hxoa 工作区</h1><div class="tun" id="tun">隧道: 连接中…</div></header>
+<main>
+  <section class="card" id="tcard">
+    <div class="row"><b>公网隧道</b><span id="tstate" class="badge off">-</span><span id="turl" class="path"></span></div>
+    <p class="hint" id="thint">AI 通过这个地址连到你的机器。cloudflared 不用自己装, 需要时会自动下载。</p>
+    <div class="row" id="tmodes">
+      <button onclick="tmode('quick')">快速隧道 (免账号)</button>
+      <button onclick="tshow('auto')">固定域名: 自动配置</button>
+      <button onclick="tshow('paste')">固定域名: 粘贴 token</button>
+      <button class="danger" onclick="tmode('off')">关闭隧道</button>
+    </div>
+    <div id="tauto" class="tform" hidden>
+      <p class="hint">在 Cloudflare 后台 → My Profile → API Tokens 创建令牌, 权限: Account · Cloudflare Tunnel · Edit, Zone · DNS · Edit, Zone · Zone · Read。hxoad 会自动建隧道, 写 DNS, 启动 cloudflared; 这个 API 令牌只用一次, 不会保存。</p>
+      <div class="row"><input type="text" id="ahost" placeholder="域名, 如 oa.example.com"><input type="password" id="atok" placeholder="Cloudflare API 令牌" style="min-width:260px"><button class="pri" onclick="tauto()">一键配置</button></div>
+    </div>
+    <div id="tpaste" class="tform" hidden>
+      <p class="hint">在 Zero Trust → Networks → Tunnels 新建隧道, Public hostname 指向 <code>http://127.0.0.1:7070</code>, 复制安装命令 (或其中的 token) 粘贴到这里。</p>
+      <div class="row"><input type="text" id="phost" placeholder="域名, 如 oa.example.com"><input type="text" id="ptok" placeholder="cloudflared ... --token eyJ... 或只粘 token" style="min-width:320px"><button class="pri" onclick="tpaste()">保存并启动</button></div>
+    </div>
+    <details style="margin-top:8px"><summary class="hint">cloudflared 日志</summary><pre id="tlogs"></pre></details>
+  </section>
+  <section class="card">
+    <div class="row"><b>添加工作区</b><span class="hint">选择一个本地目录分享出去; 每个连接者单独发令牌</span></div>
+    <div class="row" style="margin-top:10px">
+      <input type="text" id="np" placeholder="目录, 如 ~/code/project">
+      <input type="text" id="nn" placeholder="名字 (可选)" style="min-width:140px">
+      <button onclick="browse(document.getElementById('np').value)">浏览…</button>
+      <label class="toggle"><input type="checkbox" id="nw"> workers</label>
+      <label class="toggle"><input type="checkbox" id="ne" checked> 允许执行命令</label>
+      <button class="pri" onclick="addWs()">添加</button>
+    </div>
+    <div id="pick"></div>
+    <p class="hint">workers: 每个连接在自己的 git 工作树和分支里改, 互不撞车, 你在这里一键合并。不熟悉 git 或只让一个 AI 改时, 关掉它, 改动会直接出现在你的目录里 (写入仍有版本校验, 不会覆盖别人刚改的内容)。</p>
+  </section>
+  <div id="list"></div>
+  <section class="card">
+    <div class="row"><b>最近操作</b></div>
+    <table class="ops"><tbody id="ops"></tbody></table>
+  </section>
+</main>
+<dialog id="dlg"><b id="dt"></b><pre id="dp"></pre><div class="row"><button class="pri" onclick="copyPrompt()">复制</button><button onclick="dlg.close()">关闭</button></div></dialog>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+async function api(m,u,b){const r=await fetch(u,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});const j=await r.json();if(!j.ok)throw new Error(j.error||'失败');return j}
+function ago(t){if(!t||t.startsWith('0001'))return '从未连接';const s=(Date.now()-new Date(t))/1000;if(s<60)return Math.floor(s)+' 秒前';if(s<3600)return Math.floor(s/60)+' 分钟前';if(s<86400)return Math.floor(s/3600)+' 小时前';return Math.floor(s/86400)+' 天前'}
+let busy=false;
+async function load(){
+  if(busy)return;
+  try{
+    const s=await api('GET','/api/state');
+    $('tun').innerHTML=s.public_url?'隧道: <code>'+esc(s.public_url)+'</code>':'隧道: <span class="err">未就绪</span>';
+    tunnel(s.tunnel);
+    const keep={};document.querySelectorAll('[id^=tl-]').forEach(i=>keep[i.id]=i.value);
+    const focus=document.activeElement&&document.activeElement.id;
+    $('list').innerHTML=s.workspaces.map(ws).join('')||'<p class="hint">还没有工作区。</p>';
+    for(const k in keep){const i=$(k);if(i)i.value=keep[k]}
+    if(focus&&focus.startsWith('tl-')&&$(focus))$(focus).focus();
+    const o=await api('GET','/api/ops');
+    $('ops').innerHTML=o.ops.slice(0,40).map(e=>`<tr><td>${new Date(e.at).toLocaleTimeString()}</td><td>${esc(e.who)}</td><td>${esc(e.ws)}</td><td>${esc(e.op)}</td><td class="${e.ok?'':'err'}">${esc((e.target||'').slice(0,90))}${e.ok?'':' — '+esc((e.note||'').slice(0,90))}</td></tr>`).join('')||'<tr><td class="hint">暂无</td></tr>';
+  }catch(e){$('tun').innerHTML='<span class="err">后端不可用: '+esc(e.message)+'</span>'}
+}
+function ws(w){
+  const toks=w.tokens.map(t=>{
+    let wk='';
+    if(t.worker){const k=t.worker;wk=k.exists?`<div class="hint">分支 ${esc(k.branch)} · 领先 ${k.ahead||0} · 落后 ${k.behind||0}${k.dirty&&k.dirty.length?' · 未提交 '+k.dirty.length:''}</div>`:'<div class="hint">首次连接时创建工作树</div>'}
+    const canMerge=t.worker&&t.worker.exists&&((+t.worker.ahead||0)>0||(t.worker.dirty||[]).length);
+    return `<tr><td><span class="dot ${t.online?'on':''}"></span>${esc(t.label)}${wk}</td><td>${t.online?'在线':(t.bye?'已断开':'离线')}<div class="hint">${ago(t.last_seen)}${t.last_ip?' · '+esc(t.last_ip):''}</div></td><td>${t.ops}</td>
+    <td class="row"><button onclick="showPrompt('${t.id}','${esc(t.label)}')">复制连接提示</button>${t.worker?`<button ${canMerge?'':'disabled'} onclick="merge('${t.id}','${esc(t.label)}')">合并</button>`:''}<button class="danger" onclick="delTok('${t.id}','${esc(t.label)}')">删除</button></td></tr>`}).join('');
+  return `<section class="card ws"><div class="row"><h2>${esc(w.name)}</h2><span class="badge">${w.online} 在线 / ${w.tokens.length} 个连接</span>${w.git?`<span class="badge off">git: ${esc(w.branch)}</span>`:''}
+  <span style="margin-left:auto" class="row"><label class="toggle"><input type="checkbox" ${w.workers?'checked':''} ${w.git?'':'disabled title="需要 git 仓库"'} onchange="setWs('${w.id}',{workers:this.checked})"> workers</label>
+  <label class="toggle"><input type="checkbox" ${w.exec?'checked':''} onchange="setWs('${w.id}',{exec:this.checked})"> 执行命令</label>
+  <button class="danger" onclick="delWs('${w.id}','${esc(w.name)}')">移除</button></span></div>
+  <div class="path">${esc(w.path)}</div>
+  <table><thead><tr><th>身份</th><th>状态</th><th>操作数</th><th></th></tr></thead><tbody>${toks||'<tr><td colspan=4 class="hint">还没有连接</td></tr>'}</tbody></table>
+  <div class="row" style="margin-top:10px"><input type="text" id="tl-${w.id}" placeholder="身份名, 如 hark / claude-local" style="min-width:200px"><button class="pri" onclick="addTok('${w.id}')">新建连接</button></div></section>`;
+}
+const MODES={off:'未开启',quick:'快速隧道',token:'固定域名',external:'外部 cloudflared'};
+const STATES={stopped:'已停止',downloading:'正在下载 cloudflared',starting:'连接中',running:'运行中',error:'出错'};
+function tunnel(t){
+  const live=t.state==='running'&&t.url;
+  $('tstate').textContent=(MODES[t.mode]||t.mode)+(t.mode==='off'?'':' · '+(STATES[t.state]||t.state));
+  $('tstate').className='badge'+(live?'':' off');
+  $('turl').textContent=t.url||'';
+  $('thint').innerHTML=t.error?'<span class="err">'+esc(t.error)+'</span>':(t.mode==='off'?'还没开启。选一种方式, AI 就能通过公网地址连到这台机器。cloudflared 不用自己装, 需要时自动下载。':(t.mode==='quick'?'快速隧道免账号, 但 hxoad 重启后地址会变, 需要重新复制连接提示。要固定地址用下面的固定域名。':'固定地址, 重启不变。'));
+  $('tmodes').hidden=t.mode==='external'||t.fixed;
+  $('tlogs').textContent=(t.logs||[]).join('\n')||'暂无';
+}
+function tshow(k){$('tauto').hidden=k!=='auto';$('tpaste').hidden=k!=='paste'}
+async function tmode(m){try{await api('POST','/api/tunnel/mode',{mode:m});tshow('');load()}catch(e){alert(e.message)}}
+async function tauto(){const b=event.target;b.disabled=true;b.textContent='配置中…';try{await api('POST','/api/tunnel/auto',{hostname:$('ahost').value,api_token:$('atok').value});$('atok').value='';tshow('');load()}catch(e){alert(e.message)}b.disabled=false;b.textContent='一键配置'}
+async function tpaste(){try{await api('POST','/api/tunnel/token',{hostname:$('phost').value,token:$('ptok').value});$('ptok').value='';tshow('');load()}catch(e){alert(e.message)}}
+async function browse(p){
+  try{const r=await api('GET','/api/browse?path='+encodeURIComponent(p||''));$('np').value=r.path;
+    $('pick').innerHTML='<div class="picker"><div onclick="browse(\''+esc(r.parent).replace(/'/g,"\\'")+'\')">⬆ ..</div>'+r.dirs.map(d=>`<div onclick="browse('${esc(r.path+'/'+d).replace(/'/g,"\\'")}')">📁 ${esc(d)}</div>`).join('')+'</div>'+(r.git?'<div class="hint">这是 git 仓库, 可以开 workers</div>':'');
+  }catch(e){alert(e.message)}
+}
+async function addWs(){try{await api('POST','/api/workspaces',{path:$('np').value,name:$('nn').value,workers:$('nw').checked,exec:$('ne').checked});$('np').value='';$('nn').value='';$('pick').innerHTML='';load()}catch(e){alert(e.message)}}
+async function setWs(id,b){if(b.workers===false&&!confirm('关闭 workers 后, 新的修改会直接写到你的目录。已有 worker 分支会保留, 记得先合并。继续?')){load();return}try{await api('PATCH','/api/workspaces/'+id,b)}catch(e){alert(e.message)}load()}
+async function delWs(id,n){if(!confirm('移除工作区 '+n+'? 所有连接令牌立即失效, 文件不受影响。'))return;await api('DELETE','/api/workspaces/'+id);load()}
+async function addTok(id){const l=$('tl-'+id).value.trim();if(!l)return;try{const r=await api('POST','/api/workspaces/'+id+'/tokens',{label:l});openPrompt(l,r.prompt);load()}catch(e){alert(e.message)}}
+async function delTok(id,l){if(!confirm('删除连接 '+l+'? 它会立刻失去访问权。'))return;await api('DELETE','/api/tokens/'+id);load()}
+async function merge(id,l){busy=true;try{await api('POST','/api/tokens/'+id+'/merge');alert(l+' 的改动已合并到你当前分支')}catch(e){alert(e.message)}busy=false;load()}
+async function showPrompt(id,l){const r=await api('GET','/api/tokens/'+id+'/prompt');openPrompt(l,r.prompt)}
+function openPrompt(l,p){$('dt').textContent='发给 '+l+' 的连接提示';$('dp').textContent=p;$('dlg').showModal()}
+async function copyPrompt(){const t=$('dp').textContent;try{await navigator.clipboard.writeText(t)}catch{const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();document.execCommand('copy');a.remove()}$('dlg').close()}
+load();setInterval(()=>{if(!$('dlg').open)load()},3000);
+</script>
+</body>
+</html>

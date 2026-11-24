@@ -1,0 +1,8 @@
+# 用 Cloudflare 命名隧道 (固定域名):
+#   1. Cloudflare Zero Trust -> Networks -> Tunnels 新建隧道, 拿到 token
+#   2. Public hostname 指向 http://hxoad:7070
+#   3. .env 里设 CF_TUNNEL_TOKEN=... 和 HXOA_PUBLIC_URL=https://你的域名
+#   4. docker compose -f docker-compose.yml -f docker-compose.named.yml up -d --build
+services:
+  tunnel:
+    command: tunnel --no-autoupdate --metrics 0.0.0.0:2000 run --token ${CF_TUNNEL_TOKEN:?请在 .env 设置 CF_TUNNEL_TOKEN}

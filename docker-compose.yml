@@ -1,0 +1,29 @@
+# 一键部署: ./scripts/setup.sh && docker compose up -d --build
+# 面板: http://127.0.0.1:7071  (只绑本机, 不经过隧道)
+services:
+  hxoad:
+    build: .
+    image: hxoad:local
+    restart: unless-stopped
+    # 以你自己的 uid 运行, 改出来的文件归你, git 也不会报 dubious ownership
+    user: "${HXOA_UID:-1000}:${HXOA_GID:-1000}"
+    environment:
+      HXOA_HOME: ${HXOA_HOST_ROOT:?先运行 scripts/setup.sh}
+      HOME: /data/home
+      HXOA_TUNNEL_METRICS: http://tunnel:2000
+      HXOA_PUBLIC_URL: ${HXOA_PUBLIC_URL:-}
+    volumes:
+      - ./data:/data
+      # 宿主目录按原路径挂进来, 面板里看到和填写的路径与宿主一致
+      - ${HXOA_HOST_ROOT}:${HXOA_HOST_ROOT}
+    ports:
+      - "127.0.0.1:${HXOA_ADMIN_PORT:-7071}:7071"
+    # 7070 (agent API) 不对外发布, 只有隧道能访问
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    # 默认: 免账号的 quick tunnel, 每次重启地址会变, 面板会自动显示新地址。
+    # 固定地址: 见 docker-compose.named.yml
+    command: tunnel --no-autoupdate --metrics 0.0.0.0:2000 --url http://hxoad:7070
+    depends_on: [hxoad]

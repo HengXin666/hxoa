@@ -1,56 +1,83 @@
 # hxoa
 
-一个给 hark 使用的本地工作区映射客户端.
+把你本机的工作区安全地交给远端 AI (比如 Hark) 读写和执行命令, 就像它坐在你电脑前一样。
 
-hxoa 把本地工作区映射给 hark, 让它能像操作本地文件一样查阅和改写工作区.
-它是一个零信任设计的读写客户端, 把工作区安全地映射到会话里.
-
-## 为什么是零信任
-
-- 源码完全公开, 你可以自己 clone 下来逐行核对再编译, 不需要相信任何预编译产物.
-- 客户端本身不持有任何工作区内容, 也不缓存文件, 每次查看都是实时映射.
-- 连接需要一个一次性令牌, 令牌只绑定当前会话, 换一个会话就要重新连接.
-- 读写设计, 客户端可以列出, 按范围读取, 局部写入工作区文件. 笔记只写在你本机的客户端目录, 不经过网络.
-- 域名和令牌都可以配置, 不写死在任何地方, 换一个环境就能重新指过去.
-
-## 从源码构建
-
-你不需要下载任何二进制, 自己编译最稳妥. 需要 Go 1.22 或更新版本.
-
-```bash
-git clone https://github.com/HengXin666/hxoa.git
-cd hxoa
-go build -o hxoa .
-./hxoa --help
+```
+ 远端 AI ── hxoa (客户端) ──HTTPS──> Cloudflare 隧道 ──> hxoad (你本机) ──> 你的目录
+                                                          └─ 面板 http://127.0.0.1:7071 (只在本机)
 ```
 
-编译完会得到一个 hxoa 可执行文件. 交叉编译其他架构:
+三个部分, 一个仓库:
+
+| 部分 | 位置 | 作用 |
+|---|---|---|
+| `hxoad` 后端 | `cmd/hxoad`, `internal/server` | 跑在你本机; 管工作区, 令牌, 版本校验, 命令执行, workers |
+| 面板 前端 | `web/static` (编译进 hxoad) | 选目录, 开关 workers / 命令执行, 发令牌, 看谁在线, 合并 |
+| `hxoa` 客户端 | `cmd/hxoa` | AI 那边用的命令行, 输出尽量省 token |
+
+## 部署
+
+### Docker Compose (推荐)
 
 ```bash
-GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o hxoa-linux-arm64 .
+git clone https://github.com/HengXin666/hxoa.git && cd hxoa
+./scripts/setup.sh            # 生成 .env: 你的 uid/gid 和可分享的根目录 (默认 $HOME)
+docker compose up -d --build
 ```
 
-## 用法
+打开 http://127.0.0.1:7071 :
+
+1. 添加工作区: 选一个目录, 决定要不要开 **workers** 和 **允许执行命令**。
+2. 新建连接: 填一个身份名 (如 `hark`), 复制弹出的连接提示, 原样发给 AI。
+3. 面板上能看到每个连接是否在线, 最后访问时间, 操作数, 最近操作。删除连接后它立刻失去访问权, 在线数同步减少。
+
+默认用免账号的 quick tunnel, 重启后地址会变 (面板和连接提示会自动用新地址)。要固定域名见 `docker-compose.named.yml`。
+
+> Docker 模式下, AI 执行的命令跑在容器里 (镜像自带 git, gcc, python, node 等)。
+> 如果需要你本机的完整工具链和环境, 用下面的原生方式。
+
+### 原生运行
 
 ```bash
-hxoa login <token> --base <url>   连接工作区, 也可以设 HARK_BASE 环境变量
-hxoa ls [path]                    列出目录
-hxoa cat <path> [start] [end]     打印文件, 可只打印 start 到 end 行
-hxoa put <path>                   把标准输入写入工作区文件
-hxoa patch <path> <start> <end> <version>
-                                  用标准输入替换文件的指定行(1-based 含端点)
-hxoa git <command>                git 查询 (status/log/show/diff 等)
-hxoa root                         打印工作区根目录
-hxoa note <file>                  把笔记存到本机客户端目录
+./scripts/run-native.sh       # 需要 Go 1.22+ 和 cloudflared
 ```
 
-路径都相对于工作区根目录.
+## 两种模式
 
-## 笔记与源码分离
+**direct (workers 关)**: AI 直接改你的目录, 改动马上能看到。适合只有一个 AI 在改, 或者你不熟悉 git。
 
-改代码和记笔记是两件事. hxoa 把笔记单独存成一个本地文件, 和源码分开,
-方便回头查阅当时的思路, 也不会混进代码目录. 记笔记就是存一个本地文件, 只是换了个更顺手的位置.
+**worker (workers 开)**: 每个连接在 `.hxoa/workers/<身份>` 的独立 git 工作树和分支 `hxoa/<身份>` 里干活, 你的目录和其他 AI 都不受影响; 在面板点 **合并** 把它的改动合进你当前的分支 (有冲突会自动撤销, 不会弄乱你的目录)。适合你和本地 Agent, 或多个 AI 并行。
 
-## 构建流水线
+两种模式下写入都有版本校验, 见下。
 
-源码每次提交由 Actions 自动编译 linux amd64 与 arm64 并放到 Releases. 但你不依赖它, 自己 build 即可.
+## 防止编辑冲突
+
+- 每次读取都返回文件的 `version` (内容哈希); 按行读取还会返回这几行的 `range_version`。
+- 每次写入都必须带上版本: 整文件写和 `replace` 用 `version`, 按行改可以只用 `range_version`。
+- 从读取到写入之间, 只要文件 (或那几行) 被任何人改过, 包括你本地的编辑器和别的 Agent, 写入就返回 `conflict` (HTTP 409, 客户端退出码 3), 什么都不会写。
+- 服务端对同一文件的 "检查 + 写入" 加锁, 写入是临时文件 + rename, 不会写出半个文件。
+- 新建文件用 `--new`, 目标已存在会被拒绝, 不会误覆盖。
+- 不允许 `..` 和符号链接越出工作区, 不允许直接写 `.git/` 和 `.hxoa/`。
+
+## 客户端
+
+```bash
+hxoa login <token> --base <url>
+hxoa guide                     # 完整用法和规则
+hxoa ls src -d 2
+hxoa grep 'func main' -g '*.go'
+hxoa cat src/main.go 40 80 -n  # stderr: # src/main.go v=… lines 40-80/312 rv=…
+hxoa replace src/main.go -v <v> --old '旧' --new '新'
+hxoa patch src/main.go 40 42 -r <rv> < new_lines.txt
+hxoa exec 'go test ./...'      # --timeout, --bg, hxoa job <id> --wait 60
+hxoa pull src ./local-src      # 整个目录打包下载
+```
+
+协议细节见 [docs/PROTOCOL.md](docs/PROTOCOL.md)。
+
+## 安全
+
+- 令牌就是身份, 每个连接一个, 随时在面板删除; 删除工作区会吊销它的所有令牌。
+- 面板 (7071) 只绑 127.0.0.1, 从不经过隧道; 隧道只暴露 agent API (7070)。
+- 可以按工作区关闭命令执行, 只保留文件读写。
+- 状态保存在 `data/state.json` (权限 0600)。
