@@ -12,7 +12,7 @@
 | 部分 | 位置 | 作用 |
 |---|---|---|
 | `hxoad` 后端 | `cmd/hxoad`, `internal/server` | 跑在你本机; 管工作区, 令牌, 版本校验, 命令执行, workers |
-| 面板 前端 | `web/static` (编译进 hxoad) | 选目录, 开关 workers / 命令执行, 发令牌, 看谁在线, 合并 |
+| 面板 前端 | `web/ui` (React + Tailwind + Radix, 构建到 `web/static` 编译进 hxoad) | 选目录, 开关 workers / 命令执行, 发令牌, 看谁在线, 合并 |
 | `hxoa` 客户端 | `cmd/hxoa` | AI 那边用的命令行, 输出尽量省 token |
 
 ## 部署
@@ -78,6 +78,24 @@ hxoa pull src ./local-src      # 整个目录打包下载
 ## 安全
 
 - 令牌就是身份, 每个连接一个, 随时在面板删除; 删除工作区会吊销它的所有令牌。
-- 面板 (7071) 只绑 127.0.0.1, 从不经过隧道; 隧道只暴露 agent API (7070)。
+- 面板 (7071) 默认只绑 127.0.0.1, 从不经过隧道; 隧道只暴露 agent API (7070)。
+- 面板登录见下面「面板账号」。
 - 可以按工作区关闭命令执行, 只保留文件读写。
 - 状态保存在 `data/state.json` (权限 0600)。
+
+
+## 面板账号
+
+面板有自己的登录页, 右上角菜单里可以改用户名和密码 (保存后其它地方的登录全部失效)。账号存在数据目录的 `auth.json` (PBKDF2 哈希), 会话是签名 cookie, 7 天有效, 重启不掉线; 连续输错 5 次会锁一会儿。
+
+| 配置 | 作用 |
+|---|---|
+| `HXOA_ADMIN_PASSWORD` / `-admin-password` | 初始密码, 用户名 `admin`。在面板里保存过账号后就不再用它 |
+| `HXOA_PANEL_AUTH=password` (默认) | 面板自己登录 |
+| `HXOA_PANEL_AUTH=none` / `-panel-auth none` | 面板不做登录, 交给前面的反向代理 (如雷池「身份认证」、SSO 网关)。只在面板端口只能经由它访问时使用 |
+
+本机使用且没设密码时, 面板直接打开, 可以在菜单里设置账号。面板监听非本机地址时必须有账号, 或者用 `none` 模式。
+
+把面板和 agent API 放在同一个域名下 (例如 VPS 上用雷池/nginx 反代): `/v1/` 转给 7070, 其余转给 7071, 并设 `HXOA_PUBLIC_URL=https://你的域名`, 连接提示就会带这个地址。用 `none` 模式交给雷池认证时, 记得让 `/v1/` 不走雷池的身份认证, 否则 hxoa 客户端连不上 (它用令牌认证)。
+
+改前端: `cd web/ui && npm install && npm run dev` (把 `/api` 代理到本机 7071), 改完 `npm run build` 并提交 `web/static`。

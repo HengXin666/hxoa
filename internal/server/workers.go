@@ -186,7 +186,14 @@ func mergeWorker(ws *Workspace, t *Token) (string, error) {
 
 // Branch is the user's current branch name.
 func (w *Workspace) Branch() string {
-	b, _ := git(w.Path, "rev-parse", "--abbrev-ref", "HEAD")
+	// symbolic-ref also works in a repo with no commits yet.
+	b, err := git(w.Path, "symbolic-ref", "--short", "-q", "HEAD")
+	if err != nil {
+		if h, err := git(w.Path, "rev-parse", "--short", "HEAD"); err == nil {
+			return h // detached
+		}
+		return ""
+	}
 	return b
 }
 

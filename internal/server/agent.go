@@ -13,13 +13,13 @@ import (
 	"github.com/HengXin666/hxoa/internal/proto"
 )
 
-const ServerVersion = "hxoad/2.0"
+const ServerVersion = "hxoad/2.1"
 
 type Server struct {
-	Store         *Store
-	Tunnel        *TunnelManager
-	AdminPassword string // required when the panel listens beyond localhost
-	ops           opLog
+	Store  *Store
+	Tunnel *TunnelManager
+	Auth   *Auth // panel login
+	ops    opLog
 }
 
 func (s *Server) PublicURL() string { return s.Tunnel.URL() }

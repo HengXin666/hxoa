@@ -135,7 +135,7 @@ say "hxoad 已启动"
 echo
 if [ "$PUBLIC_PANEL" = 1 ]; then
   ip=$(curl -fsS --max-time 3 https://api.ipify.org 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}')
-  echo "  面板:  http://${ip:-<服务器IP>}:7071   (用户名随意, 密码: $PASSWORD)"
+  echo "  面板:  http://${ip:-<服务器IP>}:7071   (用户名 admin, 初始密码: $PASSWORD, 登录后在右上角菜单里改)"
   echo "  建议之后在面板里配好固定域名, 并用防火墙限制 7071 的来源。"
 else
   echo "  面板只监听本机。在你自己的电脑上运行:"

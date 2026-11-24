@@ -1,7 +1,6 @@
 package server
 
 import (
-	"crypto/subtle"
 	"encoding/json"
 	"io/fs"
 	"net/http"
@@ -53,7 +52,8 @@ func (s *Server) AdminHandler(static fs.FS) http.Handler {
 		}
 		writeJSON(w, 200, map[string]any{"ok": true})
 	})
-	mux.Handle("/", http.FileServer(http.FS(static)))
+	mux.Handle("/", spa(static))
+	s.Auth.Routes(mux)
 
 	mux.HandleFunc("GET /api/state", func(w http.ResponseWriter, r *http.Request) {
 		ws, ts := s.Store.Snapshot()
@@ -218,25 +218,48 @@ func (s *Server) AdminHandler(static fs.FS) http.Handler {
 	return s.guard(mux)
 }
 
-// guard asks for the panel password (HTTP Basic, any user name) when one is
-// set, and refuses cross-site writes so another tab cannot drive the panel.
+// guard keeps the panel API behind the panel login (see auth.go) and
+// refuses cross-site writes so another tab cannot drive the panel. The app
+// shell and the auth endpoints stay public so the login page can load.
 func (s *Server) guard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.AdminPassword != "" {
-			_, pw, ok := r.BasicAuth()
-			if !ok || subtle.ConstantTimeCompare([]byte(pw), []byte(s.AdminPassword)) != 1 {
-				w.Header().Set("WWW-Authenticate", `Basic realm="hxoa"`)
-				http.Error(w, "需要面板密码", http.StatusUnauthorized)
-				return
-			}
-		}
 		if r.Method != "GET" {
 			if site := r.Header.Get("Sec-Fetch-Site"); site != "" && site != "same-origin" && site != "none" {
 				http.Error(w, "cross-site request refused", http.StatusForbidden)
 				return
 			}
 		}
+		p := r.URL.Path
+		public := !strings.HasPrefix(p, "/api/") || p == "/api/auth" || p == "/api/login" || p == "/api/logout" || p == "/api/account"
+		if !public && !s.Auth.Authorized(r) {
+			writeJSON(w, 401, map[string]any{"ok": false, "error": "需要登录", "code": "login"})
+			return
+		}
 		next.ServeHTTP(w, r)
+	})
+}
+
+// spa serves the built panel; unknown non-API paths fall back to index.html.
+func spa(static fs.FS) http.Handler {
+	files := http.FileServer(http.FS(static))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p := strings.TrimPrefix(r.URL.Path, "/")
+		if strings.HasPrefix(p, "api/") {
+			writeJSON(w, 404, map[string]any{"ok": false, "error": "not found"})
+			return
+		}
+		if p != "" {
+			if _, err := fs.Stat(static, p); err != nil {
+				r = r.Clone(r.Context())
+				r.URL.Path = "/"
+			}
+		}
+		if strings.HasPrefix(p, "assets/") {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			w.Header().Set("Cache-Control", "no-cache")
+		}
+		files.ServeHTTP(w, r)
 	})
 }
 
