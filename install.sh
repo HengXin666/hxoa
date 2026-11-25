@@ -114,9 +114,23 @@ ${PASSWORD:+Environment=HXOA_ADMIN_PASSWORD=$PASSWORD}
 Restart=always
 RestartSec=3
 "
+# System service: keep commands the AI runs from climbing to root (sudo,
+# setuid, the docker socket) or seeing other users' processes.
+hardening="NoNewPrivileges=yes
+RestrictSUIDSGID=yes
+ProtectProc=invisible
+PrivateTmp=yes
+ProtectSystem=full
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+LockPersonality=yes
+InaccessiblePaths=-/run/docker.sock -/var/run/docker.sock -/run/containerd/containerd.sock
+"
 if [ "$(id -u)" = 0 ]; then
   [ "$RUN_USER" = root ] && say "注意: 服务以 root 运行, AI 执行的命令也会是 root。可用 HXOA_USER=<用户> 重新安装。"
-  printf '%sUser=%s\nWorkingDirectory=%s\n\n[Install]\nWantedBy=multi-user.target\n' "$unit" "$RUN_USER" "$RUN_HOME" > /etc/systemd/system/hxoad.service
+  [ "$RUN_USER" = root ] && hardening=""
+  printf '%s%sUser=%s\nWorkingDirectory=%s\n\n[Install]\nWantedBy=multi-user.target\n' "$unit" "$hardening" "$RUN_USER" "$RUN_HOME" > /etc/systemd/system/hxoad.service
   chmod 600 /etc/systemd/system/hxoad.service
   systemctl daemon-reload
   systemctl enable --now hxoad

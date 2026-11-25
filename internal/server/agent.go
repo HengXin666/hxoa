@@ -3,7 +3,6 @@ package server
 import (
 	"encoding/json"
 	"errors"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,7 +12,7 @@ import (
 	"github.com/HengXin666/hxoa/internal/proto"
 )
 
-const ServerVersion = "hxoad/2.2"
+const ServerVersion = "hxoad/2.2.1"
 
 type Server struct {
 	Store  *Store
@@ -98,14 +97,6 @@ func writeErr(w http.ResponseWriter, err error) {
 		return
 	}
 	writeJSON(w, http.StatusBadRequest, proto.Error{Error: err.Error(), Code: proto.CodeBadRequest})
-}
-
-func clientIP(r *http.Request) string {
-	if ip := r.Header.Get("Cf-Connecting-Ip"); ip != "" {
-		return ip
-	}
-	host, _, _ := net.SplitHostPort(r.RemoteAddr)
-	return host
 }
 
 func bearer(r *http.Request) string {

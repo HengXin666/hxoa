@@ -65,6 +65,21 @@ type Auth struct {
 type failCount struct {
 	n     int
 	until time.Time
+	last  time.Time
+}
+
+// pruneFails forgets addresses that have been quiet for a day, so the table
+// cannot grow without bound. Caller holds a.mu.
+func (a *Auth) pruneFails() {
+	if len(a.fails) < 1024 {
+		return
+	}
+	cut := time.Now().Add(-24 * time.Hour)
+	for k, f := range a.fails {
+		if f.last.Before(cut) && time.Now().After(f.until) {
+			delete(a.fails, k)
+		}
+	}
 }
 
 func NewAuth(dataDir, mode, seedPassword string, loopback bool) (*Auth, error) {
@@ -237,6 +252,7 @@ func (a *Auth) Routes(mux *http.ServeMux) {
 		ip := clientIP(r)
 		a.mu.Lock()
 		defer a.mu.Unlock()
+		a.pruneFails()
 		if f := a.fails[ip]; f != nil && time.Now().Before(f.until) {
 			writeJSON(w, 429, map[string]any{"ok": false, "error": "尝试次数过多, 请 " + strconv.Itoa(int(time.Until(f.until).Seconds())+1) + " 秒后再试"})
 			return
@@ -252,6 +268,7 @@ func (a *Auth) Routes(mux *http.ServeMux) {
 				a.fails[ip] = f
 			}
 			f.n++
+			f.last = time.Now()
 			if f.n >= 5 {
 				f.until = time.Now().Add(time.Duration(f.n-4) * time.Minute)
 			}
