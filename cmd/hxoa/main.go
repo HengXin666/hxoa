@@ -328,6 +328,8 @@ func run(args []string) error {
 		return cmdRm(c, rest)
 	case "mv":
 		return cmdMv(c, rest)
+	case "mkdir":
+		return cmdMkdir(c, rest)
 	case "grep":
 		return cmdGrep(c, rest)
 	case "exec", "run":
@@ -677,6 +679,25 @@ func cmdRm(c *config, args []string) error {
 	}
 	remember(c, f.pos[0], "")
 	fmt.Println("ok")
+	return nil
+}
+
+func cmdMkdir(c *config, args []string) error {
+	f := parse(args)
+	if len(f.pos) < 1 {
+		return usage("mkdir <path>")
+	}
+	var out struct {
+		Created bool `json:"created"`
+	}
+	if err := call(c, "POST", "/v1/mkdir", nil, &proto.MkdirReq{Path: f.pos[0]}, &out); err != nil {
+		return err
+	}
+	if out.Created {
+		fmt.Println("ok")
+	} else {
+		fmt.Println("ok (已存在)")
+	}
 	return nil
 }
 

@@ -223,6 +223,38 @@ func (s *Server) AdminHandler(static fs.FS) http.Handler {
 		_, gerr := os.Stat(filepath.Join(p, ".git"))
 		writeJSON(w, 200, map[string]any{"ok": true, "path": p, "parent": filepath.Dir(p), "dirs": dirs, "git": gerr == nil})
 	})
+	// New folder in the directory picker: one plain name under an existing directory.
+	mux.HandleFunc("POST /api/mkdir", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Parent string `json:"parent"`
+			Name   string `json:"name"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, 400, map[string]any{"ok": false, "error": "请求格式不对"})
+			return
+		}
+		name := strings.TrimSpace(req.Name)
+		if name == "" || name == "." || name == ".." || len(name) > 255 || strings.ContainsAny(name, "/\\\x00") {
+			writeJSON(w, 400, map[string]any{"ok": false, "error": "文件夹名不能为空, 不能含 / 或 \\"})
+			return
+		}
+		parent := filepath.Clean(expandHome(req.Parent))
+		if st, err := os.Stat(parent); err != nil || !st.IsDir() {
+			writeJSON(w, 400, map[string]any{"ok": false, "error": "上级目录不存在: " + parent})
+			return
+		}
+		p := filepath.Join(parent, name)
+		if err := os.Mkdir(p, 0o755); err != nil {
+			msg := err.Error()
+			if os.IsExist(err) {
+				msg = "已经有叫 " + name + " 的文件或文件夹"
+			}
+			writeJSON(w, 400, map[string]any{"ok": false, "error": msg})
+			return
+		}
+		s.ops.add(opEntry{At: time.Now(), Who: "你", Op: "mkdir", Target: p, OK: true})
+		writeJSON(w, 200, map[string]any{"ok": true, "path": p})
+	})
 	return s.guard(mux)
 }
 

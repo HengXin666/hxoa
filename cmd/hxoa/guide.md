@@ -28,7 +28,7 @@ hxoa: 连接用户本机工作区的客户端. 路径都相对于工作区根目
   hxoa write <path> --new < 内容                     新建 (已存在会拒绝)
   hxoa write <path> < 内容                           整体改写
   hxoa push <本地文件> <path> [--new]                 上传本地文件
-  hxoa rm <path>     hxoa mv <from> <to>
+  hxoa rm <path>     hxoa mv <from> <to>     hxoa mkdir <path>
   -v <version> 可显式指定版本.
   --force 跳过版本检查, 只在用户明确要求时用.
 

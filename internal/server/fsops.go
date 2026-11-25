@@ -412,6 +412,28 @@ func doRm(root string, req *proto.RmReq) error {
 	return os.Remove(abs)
 }
 
+// doMkdir creates a directory inside the workspace; created is false when it
+// already existed. A file in the way is an exists error.
+func doMkdir(root string, req *proto.MkdirReq) (created bool, err error) {
+	if strings.Trim(filepath.ToSlash(req.Path), "/") == "" {
+		return false, errf(proto.CodeBadRequest, "path 必填")
+	}
+	abs, err := resolve(root, req.Path, true)
+	if err != nil {
+		return false, err
+	}
+	if st, e := os.Stat(abs); e == nil {
+		if st.IsDir() {
+			return false, nil
+		}
+		return false, errf(proto.CodeExists, "已有同名文件: "+req.Path)
+	}
+	if err := os.MkdirAll(abs, 0o755); err != nil {
+		return false, errf(proto.CodeBadRequest, err.Error())
+	}
+	return true, nil
+}
+
 func doMv(root string, req *proto.MvReq) error {
 	from, err := resolve(root, req.From, true)
 	if err != nil {

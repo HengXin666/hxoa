@@ -12,7 +12,7 @@ import (
 	"github.com/HengXin666/hxoa/internal/proto"
 )
 
-const ServerVersion = "hxoad/2.2.1"
+const ServerVersion = "hxoad/2.3.0"
 
 type Server struct {
 	Store  *Store
@@ -224,6 +224,18 @@ func (s *Server) AgentHandler() http.Handler {
 		}
 		writeJSON(w, 200, map[string]any{"ok": true})
 		return req.From + " -> " + req.To, nil
+	})
+	h("/v1/mkdir", "mkdir", func(w http.ResponseWriter, r *http.Request, c *reqCtx) (string, error) {
+		var req proto.MkdirReq
+		if err := decode(r, &req); err != nil {
+			return "", err
+		}
+		created, err := doMkdir(c.root, &req)
+		if err != nil {
+			return req.Path, err
+		}
+		writeJSON(w, 200, map[string]any{"ok": true, "created": created})
+		return req.Path, nil
 	})
 	h("/v1/grep", "grep", func(w http.ResponseWriter, r *http.Request, c *reqCtx) (string, error) {
 		var req proto.GrepReq

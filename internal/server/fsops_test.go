@@ -81,3 +81,29 @@ func TestVersionedEdits(t *testing.T) {
 		t.Fatal("want ambiguous", err)
 	}
 }
+
+func TestMkdir(t *testing.T) {
+	root := t.TempDir()
+	if c, err := doMkdir(root, &proto.MkdirReq{Path: "a/b"}); err != nil || !c {
+		t.Fatal("want created", c, err)
+	}
+	if st, err := os.Stat(filepath.Join(root, "a", "b")); err != nil || !st.IsDir() {
+		t.Fatal("dir missing", err)
+	}
+	if c, err := doMkdir(root, &proto.MkdirReq{Path: "a/b"}); err != nil || c {
+		t.Fatal("existing dir should be ok and not created", c, err)
+	}
+	os.WriteFile(filepath.Join(root, "f"), []byte("x"), 0o644)
+	if _, err := doMkdir(root, &proto.MkdirReq{Path: "f"}); code(err) != proto.CodeExists {
+		t.Fatal("want exists", err)
+	}
+	if _, err := doMkdir(root, &proto.MkdirReq{Path: "../x"}); code(err) != proto.CodeDenied {
+		t.Fatal("want denied", err)
+	}
+	if _, err := doMkdir(root, &proto.MkdirReq{Path: ".git/x"}); code(err) != proto.CodeDenied {
+		t.Fatal("want denied for .git", err)
+	}
+	if _, err := doMkdir(root, &proto.MkdirReq{Path: "/"}); code(err) != proto.CodeBadRequest {
+		t.Fatal("want bad request for empty", err)
+	}
+}

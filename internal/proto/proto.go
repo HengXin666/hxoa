@@ -130,6 +130,11 @@ type RmReq struct {
 	IfMatch string `json:"if_match"`
 }
 
+// MkdirReq creates a directory (and missing parents). An existing directory is fine.
+type MkdirReq struct {
+	Path string `json:"path"`
+}
+
 type MvReq struct {
 	From    string `json:"from"`
 	To      string `json:"to"`

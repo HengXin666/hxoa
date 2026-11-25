@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ChevronRight, CornerLeftUp, Folder, GitBranch, Home, Loader2, X } from "lucide-react";
+import { ChevronRight, CornerLeftUp, Folder, FolderPlus, GitBranch, Home, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -42,6 +42,9 @@ export default function AddWorkspaceDialog({
   const [name, setName] = React.useState("");
   const [workers, setWorkers] = React.useState(false);
   const [exec, setExec] = React.useState(true);
+  // 新建文件夹: null = 没在新建, 字符串 = 正在输入的名字
+  const [newDir, setNewDir] = React.useState<string | null>(null);
+  const [making, setMaking] = React.useState(false);
 
   const browse = React.useCallback(async (p: string) => {
     setLoading(true);
@@ -56,6 +59,22 @@ export default function AddWorkspaceDialog({
       setLoading(false);
     }
   }, []);
+
+  async function mkdir() {
+    const n = (newDir ?? "").trim();
+    if (!cur || !n || making) return;
+    setMaking(true);
+    try {
+      const r = await api<{ path: string }>("POST", "api/mkdir", { parent: cur.path, name: n });
+      setNewDir(null);
+      toast.success("已新建 " + n);
+      await browse(r.path);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setMaking(false);
+    }
+  }
 
   React.useEffect(() => {
     if (open && !cur) browse("");
@@ -116,6 +135,9 @@ export default function AddWorkspaceDialog({
           <Button type="button" variant="outline" size="icon" title="主目录" onClick={() => browse("")}>
             <Home />
           </Button>
+          <Button type="button" variant="outline" size="icon" title="在当前目录新建文件夹" aria-label="新建文件夹" disabled={!cur} onClick={() => setNewDir("")}>
+            <FolderPlus />
+          </Button>
         </form>
 
         <div className="overflow-hidden rounded-lg border">
@@ -148,6 +170,38 @@ export default function AddWorkspaceDialog({
                   <Row onClick={() => browse(cur.parent)} icon={<CornerLeftUp />}>
                     上一级
                   </Row>
+                )}
+                {newDir !== null && (
+                  <form
+                    className="flex items-center gap-2.5 py-1 pr-2 pl-4"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      mkdir();
+                    }}
+                  >
+                    <FolderPlus className="text-muted-foreground size-4 shrink-0" />
+                    <Input
+                      autoFocus
+                      value={newDir}
+                      onChange={(e) => setNewDir(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setNewDir(null);
+                        }
+                      }}
+                      placeholder="新文件夹名, 回车创建"
+                      className="h-8 font-mono text-[0.8125rem]"
+                      disabled={making}
+                    />
+                    <Button type="submit" size="sm" disabled={!newDir.trim() || making}>
+                      {making ? <Loader2 className="animate-spin" /> : "创建"}
+                    </Button>
+                    <Button type="button" size="icon" variant="ghost" className="size-8" aria-label="取消新建" onClick={() => setNewDir(null)}>
+                      <X />
+                    </Button>
+                  </form>
                 )}
                 {cur?.dirs.map((d) => {
                   const p = cur.path.replace(/\/$/, "") + "/" + d;

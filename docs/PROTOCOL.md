@@ -27,6 +27,7 @@
 | POST `/v1/patch` | `{path, if_match \| range_match, edits:[...]}` 见下 |
 | POST `/v1/rm` | `{path, if_match}` |
 | POST `/v1/mv` | `{from, to, if_match}` |
+| POST `/v1/mkdir` | `{path}` 建目录 (含缺的上级) → `{created}`; 已有同名目录 created 为 false, 同名文件为 exists |
 | POST `/v1/grep` | `{pattern, path, glob, fixed, icase, max}` → `{text}` |
 | POST `/v1/exec` | `{cmd, dir, timeout, bg, stdin}` → `{code, stdout, stderr, ms, timed_out}` 或 `{job}` |
 | GET `/v1/job?id=&wait=&kill=1` | 后台任务状态和输出 |
@@ -51,6 +52,7 @@
 
 `GET /api/state`, `GET /api/ops`, `POST/PATCH/DELETE /api/workspaces[/{id}]`,
 `POST /api/workspaces/{id}/tokens`, `GET /api/tokens/{id}/prompt`,
-`DELETE /api/tokens/{id}`, `POST /api/tokens/{id}/merge`, `GET /api/browse?path=`。
+`DELETE /api/tokens/{id}`, `POST /api/tokens/{id}/merge`, `GET /api/browse?path=`,
+`POST /api/mkdir` (`{parent, name}`, 选目录时新建文件夹)。
 
 在线 = 3 分钟内有请求且没有登出。删除令牌立即生效。
