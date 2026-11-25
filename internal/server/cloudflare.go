@@ -42,6 +42,7 @@ type TunnelManager struct {
 	lastErr string
 	logs    []string
 	gen     int
+	netdesc string
 }
 
 func NewTunnelManager(store *Store, agentAddr, fixed, metrics string) *TunnelManager {
@@ -88,6 +89,8 @@ type TunnelStatus struct {
 	Logs     []string `json:"logs"`
 	Binary   string   `json:"binary,omitempty"`
 	Fixed    bool     `json:"fixed,omitempty"`
+	Hint     string   `json:"hint,omitempty"`    // plain-language reason when not running
+	Network  string   `json:"network,omitempty"` // how cloudflared dials Cloudflare
 }
 
 func (m *TunnelManager) Status() TunnelStatus {
@@ -105,6 +108,10 @@ func (m *TunnelManager) Status() TunnelStatus {
 		Logs: append([]string{}, m.logs...), Fixed: m.fixed != ""}
 	if m.fixed != "" {
 		st.URL = m.fixed
+	}
+	if mode == "quick" || mode == "token" {
+		st.Hint = diagnose(m.logs, m.state)
+		st.Network = m.netdesc
 	}
 	st.Binary, _ = m.findBinary()
 	return st
@@ -174,11 +181,16 @@ func (m *TunnelManager) supervise(cfg TunnelConfig, args []string) {
 			continue
 		}
 		m.setState("starting", "")
+		ne := probeNetwork(ctx)
+		m.mu.Lock()
+		m.netdesc = ne.describe()
+		m.mu.Unlock()
+		m.logLine("网络: " + ne.describe())
 		cmd := exec.CommandContext(ctx, bin, args...)
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 		cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM) }
 		cmd.WaitDelay = 5 * time.Second
-		cmd.Env = scrubEnv(os.Environ())
+		cmd.Env = append(scrubEnv(os.Environ()), ne.env()...)
 		if cfg.Mode == "token" {
 			cmd.Env = append(cmd.Env, "TUNNEL_TOKEN="+cfg.Token) // not on argv, so ps cannot show it
 		}

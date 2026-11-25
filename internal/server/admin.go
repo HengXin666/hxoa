@@ -30,6 +30,14 @@ func (s *Server) AdminHandler(static fs.FS) http.Handler {
 		}
 		writeJSON(w, 200, map[string]any{"ok": true})
 	})
+	mux.HandleFunc("POST /api/tunnel/check", func(w http.ResponseWriter, r *http.Request) {
+		steps := s.Tunnel.Check(r.Context(), s.PublicURL())
+		ok := len(steps) > 0
+		for _, st := range steps {
+			ok = ok && st.OK
+		}
+		writeJSON(w, 200, map[string]any{"ok": true, "healthy": ok, "steps": steps})
+	})
 	mux.HandleFunc("POST /api/tunnel/token", func(w http.ResponseWriter, r *http.Request) {
 		var in struct{ Token, Hostname string }
 		json.NewDecoder(r.Body).Decode(&in)

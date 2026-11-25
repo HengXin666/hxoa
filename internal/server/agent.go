@@ -13,7 +13,7 @@ import (
 	"github.com/HengXin666/hxoa/internal/proto"
 )
 
-const ServerVersion = "hxoad/2.1"
+const ServerVersion = "hxoad/2.2"
 
 type Server struct {
 	Store  *Store

@@ -72,6 +72,15 @@ export interface Tunnel {
   fixed?: boolean;
   hostname?: string;
   logs?: string[];
+  hint?: string;
+  network?: string;
+}
+
+export interface CheckStep {
+  name: string;
+  ok: boolean;
+  detail: string;
+  ms?: number;
 }
 
 export interface State {

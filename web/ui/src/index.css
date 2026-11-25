@@ -71,11 +71,15 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
-  --font-mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", Menlo, monospace;
+  /* One sans stack and one mono stack. The mono stack ends in the same CJK
+     faces as the sans one, so a path with Chinese in it does not switch
+     fonts half way through. */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", "SFMono-Regular", ui-monospace, Menlo, Consolas, "Cascadia Mono", "DejaVu Sans Mono", "Noto Sans Mono", "Liberation Mono", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", monospace;
 }
 
 @layer base {
   * { @apply border-border outline-ring/50; }
-  body { @apply bg-background text-foreground antialiased; }
+  body { @apply bg-background text-foreground font-sans antialiased; }
+  input, button, select, textarea { font: inherit; }
 }
