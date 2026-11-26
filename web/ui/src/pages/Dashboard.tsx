@@ -1,6 +1,6 @@
 import * as React from "react";
 import { toast } from "sonner";
-import { Activity, CircleUser, FolderGit2, Globe, KeyRound, LogOut, Plus, ShieldCheck, Smartphone } from "lucide-react";
+import { Activity, CircleUser, ClipboardList, FolderGit2, Globe, KeyRound, LogOut, Plus, ShieldCheck, Smartphone } from "lucide-react";
 import { api, ApiError, type AuthInfo, type Op, type State } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -21,16 +21,18 @@ import OpsTable from "@/components/OpsCard";
 import AccountDialog from "@/components/AccountDialog";
 import PromptDialog from "@/components/PromptDialog";
 import RemoteAdminView from "@/components/RemoteAdminView";
+import { busyCount, GlobalWork } from "@/components/IssueWork";
 
 export type Run = (fn: () => Promise<unknown>, ok?: string) => Promise<void>;
 
-type View = { kind: "ws"; id: string } | { kind: "net" } | { kind: "ops" } | { kind: "remote" };
+type View = { kind: "ws"; id: string } | { kind: "net" } | { kind: "ops" } | { kind: "remote" } | { kind: "work" };
 
 function readHash(): View | null {
   const h = decodeURIComponent(location.hash.slice(1));
   if (h === "net") return { kind: "net" };
   if (h === "ops") return { kind: "ops" };
   if (h === "remote") return { kind: "remote" };
+  if (h === "work") return { kind: "work" };
   if (h.startsWith("ws/")) return { kind: "ws", id: h.slice(3) };
   return null;
 }
@@ -168,6 +170,12 @@ export default function Dashboard({ auth, onAuthChange }: { auth: AuthInfo; onAu
             )}
           </nav>
           <div className="space-y-0.5 border-t p-2">
+            <SideItem active={current?.kind === "work"} onClick={() => setView({ kind: "work" })} icon={<ClipboardList />}>
+              全局分工
+              {state && busyCount(state.workspaces) > 0 && (
+                <span className="text-muted-foreground ml-auto text-xs">{busyCount(state.workspaces)}</span>
+              )}
+            </SideItem>
             <SideItem active={current?.kind === "net"} onClick={() => setView({ kind: "net" })} icon={<Globe />}>
               公网访问
               {health && (
@@ -195,6 +203,7 @@ export default function Dashboard({ auth, onAuthChange }: { auth: AuthInfo; onAu
               </div>
             )}
             {state && current?.kind === "net" && <NetworkView tunnel={state.tunnel} publicUrl={state.public_url} run={run} />}
+            {state && current?.kind === "work" && <GlobalWork workspaces={state.workspaces} onOpen={(id) => setView({ kind: "ws", id })} />}
             {state && current?.kind === "remote" && <RemoteAdminView run={run} publicUrl={state.public_url} />}
             {state && current?.kind === "ops" && (
               <section className="grid gap-4">

@@ -169,14 +169,22 @@ export function TaskDialog({ t, run, onClose }: { t: TokenView | null; run: Run;
 }
 
 export function IssueBoard({ ws }: { ws: WS }) {
+  return (
+    <div className="grid gap-4">
+      <p className="text-muted-foreground text-sm">
+        按 issue 看谁在做。实心是登记过的 (hxoa task 或你在「连接」里派的), 虚线是只在未合并的提交里提到的。一个 issue 落到两个身份会标出来。
+      </p>
+      <IssueRows ws={ws} />
+    </div>
+  );
+}
+
+function IssueRows({ ws }: { ws: WS }) {
   const map = issueMap(ws);
   const title = useIssueTitles(ws, [...map.keys()]);
   const idle = ws.tokens.filter((t) => !t.task && !(t.worker?.refs ?? []).length);
   return (
-    <div className="grid gap-4">
-      <p className="text-muted-foreground text-sm">
-        按 issue 看谁在做。实心是登记过的 (hxoa task 或你在「连接」里派的), 虚线是只在未合并的提交里提到的。一个 issue 落到两个身份上会标出来。
-      </p>
+    <>
       <div className="bg-card divide-y rounded-xl border">
         {map.size === 0 && <p className="text-muted-foreground px-4 py-6 text-center text-sm">还没有身份登记任务, 提交里也没提到 issue。</p>}
         {[...map.entries()].map(([n, hs]) => {
@@ -211,6 +219,41 @@ export function IssueBoard({ ws }: { ws: WS }) {
           空闲: {idle.map((t) => t.label).join(", ")}
         </p>
       )}
-    </div>
+    </>
   );
+}
+
+// All workspaces at once, refreshed with the panel's state poll.
+export function GlobalWork({ workspaces, onOpen }: { workspaces: WS[]; onOpen: (id: string) => void }) {
+  const list = workspaces.filter((w) => w.tokens.length > 0);
+  return (
+    <section className="grid gap-6">
+      <div className="grid gap-1">
+        <h1 className="text-xl font-semibold">全局分工</h1>
+        <p className="text-muted-foreground text-sm">每个工作区的身份各在做哪些 issue, 几秒刷新一次。实心是登记的, 虚线是只在未合并提交里提到的, 撞车标红。</p>
+      </div>
+      {list.length === 0 && <p className="text-muted-foreground text-sm">还没有任何连接。</p>}
+      {list.map((w) => (
+        <div key={w.id} className="grid gap-2">
+          <div className="flex items-center gap-2">
+            <button onClick={() => onOpen(w.id)} className="text-sm font-medium hover:underline">
+              {w.name}
+            </button>
+            <span className="text-muted-foreground text-xs">{w.online} 在线 / {w.tokens.length}</span>
+            {w.repo && (
+              <a href={w.repo} target="_blank" rel="noreferrer" className="text-muted-foreground font-mono text-xs hover:underline">
+                {w.repo.replace("https://github.com/", "")}
+              </a>
+            )}
+          </div>
+          <IssueRows ws={w} />
+        </div>
+      ))}
+    </section>
+  );
+}
+
+// Issues in flight across all workspaces, for the sidebar count.
+export function busyCount(workspaces: WS[]) {
+  return workspaces.reduce((a, w) => a + issueMap(w).size, 0);
 }
