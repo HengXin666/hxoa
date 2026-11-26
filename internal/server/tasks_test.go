@@ -75,6 +75,10 @@ func TestWorkerTask(t *testing.T) {
 	if st := workerStatus(w2, tk); !reflect.DeepEqual(st.Refs, []int{104, 110}) {
 		t.Fatal("refs", st.Refs)
 	}
+	run(t, repo, "git", "update-ref", "refs/remotes/origin/main", "hxoa/"+workerKey(tk))
+	if st := workerStatus(w2, tk); len(st.Refs) != 0 {
+		t.Fatal("pushed commits should not count", st.Refs)
+	}
 	if repoURL(repo) != "https://github.com/o/r" {
 		t.Fatal("repo", repoURL(repo))
 	}

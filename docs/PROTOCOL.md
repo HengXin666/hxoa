@@ -56,7 +56,7 @@
 `DELETE /api/tokens/{id}`, `POST /api/tokens/{id}/merge`, `GET /api/browse?path=`,
 `POST /api/mkdir` (`{parent, name}`, 选目录时新建文件夹), `PUT /api/tokens/{id}/task` (用户给连接派活, 格式同 `/v1/task`)。
 
-分工: `GET /api/state` 的工作区带 `repo` (origin 在 GitHub 时的页面地址), 连接带 `task` (`{issues, note, by: agent|user, at}`), worker 带 `refs` (未合并提交说明里出现的 `#号`)。`GET /api/workspaces/{id}/issues` → `{issues:{"104":{title,state}}}`, 用本机 `gh` 登录读, 缓存 5 分钟; 没装 gh 时为空, 面板改从浏览器问 GitHub。
+分工: `GET /api/state` 的工作区带 `repo` (origin 在 GitHub 时的页面地址), 连接带 `task` (`{issues, note, by: agent|user, at}`), worker 带 `refs` (只在这个分支上的提交说明里出现的 `#号`: 不在你当前分支, 也没推到任何远端)。`GET /api/workspaces/{id}/issues` → `{issues:{"104":{title,state}}}`, 用本机 `gh` 登录读, 缓存 5 分钟; 没装 gh 时为空, 面板改从浏览器问 GitHub。
 
 在线 = 3 分钟内有请求且没有登出。删除令牌立即生效。
 

@@ -225,14 +225,15 @@ function IssueRows({ ws }: { ws: WS }) {
 
 // All workspaces at once, refreshed with the panel's state poll.
 export function GlobalWork({ workspaces, onOpen }: { workspaces: WS[]; onOpen: (id: string) => void }) {
-  const list = workspaces.filter((w) => w.tokens.length > 0);
+  const list = workspaces.filter((w) => issueMap(w).size > 0);
+  const quiet = workspaces.filter((w) => w.tokens.length > 0 && issueMap(w).size === 0);
   return (
     <section className="grid gap-6">
       <div className="grid gap-1">
         <h1 className="text-xl font-semibold">全局分工</h1>
         <p className="text-muted-foreground text-sm">每个工作区的身份各在做哪些 issue, 几秒刷新一次。实心是登记的, 虚线是只在未合并提交里提到的, 撞车标红。</p>
       </div>
-      {list.length === 0 && <p className="text-muted-foreground text-sm">还没有任何连接。</p>}
+      {list.length === 0 && <p className="text-muted-foreground text-sm">现在没有身份在做 issue。</p>}
       {list.map((w) => (
         <div key={w.id} className="grid gap-2">
           <div className="flex items-center gap-2">
@@ -249,6 +250,19 @@ export function GlobalWork({ workspaces, onOpen }: { workspaces: WS[]; onOpen: (
           <IssueRows ws={w} />
         </div>
       ))}
+      {quiet.length > 0 && (
+        <p className="text-muted-foreground text-sm">
+          没在做 issue 的工作区:{" "}
+          {quiet.map((w, i) => (
+            <React.Fragment key={w.id}>
+              {i > 0 && ", "}
+              <button onClick={() => onOpen(w.id)} className="hover:text-foreground hover:underline">
+                {w.name}
+              </button>
+            </React.Fragment>
+          ))}
+        </p>
+      )}
     </section>
   );
 }

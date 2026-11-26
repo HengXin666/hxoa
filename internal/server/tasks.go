@@ -49,10 +49,12 @@ func issueRefs(text string) []int {
 	return out
 }
 
-// workerRefs lists the issues mentioned by commits on the worker branch that
-// are not on the user's current branch yet: what this worker is carrying.
+// workerRefs lists the issues mentioned by commits only this worker carries:
+// not on the user's current branch and not pushed anywhere. Workers that
+// merge origin/main pick up everyone's pushed commits, so --remotes keeps
+// those from showing up under every worker.
 func workerRefs(ws *Workspace, branch string) []int {
-	out, err := git(ws.Path, "log", "--format=%B", "HEAD.."+branch)
+	out, err := git(ws.Path, "log", "--format=%B", branch, "--not", "HEAD", "--remotes")
 	if err != nil {
 		return nil
 	}
