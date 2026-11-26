@@ -51,6 +51,7 @@ type stateFile struct {
 	Workspaces []*Workspace  `json:"workspaces"`
 	Tokens     []*Token      `json:"tokens"`
 	Tunnel     *TunnelConfig `json:"tunnel,omitempty"`
+	Admins     []*AdminToken `json:"admin_tokens,omitempty"`
 }
 
 // Store keeps state in memory and persists it to one JSON file.
@@ -60,6 +61,7 @@ type Store struct {
 	ws        map[string]*Workspace
 	tokens    map[string]*Token // by secret
 	tunnel    TunnelConfig
+	admins    map[string]*AdminToken // by secret hash
 	dirty     bool
 	OnlineFor time.Duration
 }
@@ -72,6 +74,7 @@ func OpenStore(dir string) (*Store, error) {
 		path:      filepath.Join(dir, "state.json"),
 		ws:        map[string]*Workspace{},
 		tokens:    map[string]*Token{},
+		admins:    map[string]*AdminToken{},
 		OnlineFor: 3 * time.Minute,
 	}
 	raw, err := os.ReadFile(s.path)
@@ -88,6 +91,9 @@ func OpenStore(dir string) (*Store, error) {
 		}
 		if f.Tunnel != nil {
 			s.tunnel = *f.Tunnel
+		}
+		for _, a := range f.Admins {
+			s.admins[a.Hash] = a
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
@@ -115,6 +121,10 @@ func (s *Store) saveLocked() error {
 	for _, t := range s.tokens {
 		f.Tokens = append(f.Tokens, t)
 	}
+	for _, a := range s.admins {
+		f.Admins = append(f.Admins, a)
+	}
+	sort.Slice(f.Admins, func(i, j int) bool { return f.Admins[i].Created.Before(f.Admins[j].Created) })
 	sort.Slice(f.Workspaces, func(i, j int) bool { return f.Workspaces[i].Created.Before(f.Workspaces[j].Created) })
 	sort.Slice(f.Tokens, func(i, j int) bool { return f.Tokens[i].Created.Before(f.Tokens[j].Created) })
 	raw, _ := json.MarshalIndent(f, "", "  ")

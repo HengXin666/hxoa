@@ -1,6 +1,6 @@
 import * as React from "react";
 import { toast } from "sonner";
-import { Activity, CircleUser, FolderGit2, Globe, KeyRound, LogOut, Plus, ShieldCheck } from "lucide-react";
+import { Activity, CircleUser, FolderGit2, Globe, KeyRound, LogOut, Plus, ShieldCheck, Smartphone } from "lucide-react";
 import { api, ApiError, type AuthInfo, type Op, type State } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -20,15 +20,17 @@ import WorkspaceTree from "@/components/WorkspaceTree";
 import OpsTable from "@/components/OpsCard";
 import AccountDialog from "@/components/AccountDialog";
 import PromptDialog from "@/components/PromptDialog";
+import RemoteAdminView from "@/components/RemoteAdminView";
 
 export type Run = (fn: () => Promise<unknown>, ok?: string) => Promise<void>;
 
-type View = { kind: "ws"; id: string } | { kind: "net" } | { kind: "ops" };
+type View = { kind: "ws"; id: string } | { kind: "net" } | { kind: "ops" } | { kind: "remote" };
 
 function readHash(): View | null {
   const h = decodeURIComponent(location.hash.slice(1));
   if (h === "net") return { kind: "net" };
   if (h === "ops") return { kind: "ops" };
+  if (h === "remote") return { kind: "remote" };
   if (h.startsWith("ws/")) return { kind: "ws", id: h.slice(3) };
   return null;
 }
@@ -172,6 +174,9 @@ export default function Dashboard({ auth, onAuthChange }: { auth: AuthInfo; onAu
                 <span className={cn("ml-auto size-2 rounded-full", health.tone === "ok" ? "bg-success" : health.tone === "bad" ? "bg-destructive" : "bg-amber-500")} />
               )}
             </SideItem>
+            <SideItem active={current?.kind === "remote"} onClick={() => setView({ kind: "remote" })} icon={<Smartphone />}>
+              远程管理
+            </SideItem>
             <SideItem active={current?.kind === "ops"} onClick={() => setView({ kind: "ops" })} icon={<Activity />}>
               操作记录
             </SideItem>
@@ -190,6 +195,7 @@ export default function Dashboard({ auth, onAuthChange }: { auth: AuthInfo; onAu
               </div>
             )}
             {state && current?.kind === "net" && <NetworkView tunnel={state.tunnel} publicUrl={state.public_url} run={run} />}
+            {state && current?.kind === "remote" && <RemoteAdminView run={run} publicUrl={state.public_url} />}
             {state && current?.kind === "ops" && (
               <section className="grid gap-4">
                 <h1 className="text-xl font-semibold">操作记录</h1>

@@ -99,3 +99,13 @@ export interface Op {
   ok: boolean;
   note?: string;
 }
+
+export interface AdminToken {
+  id: string;
+  label: string;
+  hint: string;
+  created: string;
+  last_seen?: string;
+  last_ip?: string;
+  ops: number;
+}

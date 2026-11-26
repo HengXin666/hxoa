@@ -13,8 +13,19 @@ import (
 
 // AdminHandler serves the local panel and its API. It must only be reachable
 // from this machine: it is bound to 127.0.0.1 and never sent through the tunnel.
+// A subset of the API is also reachable remotely with an admin token, see remote.go.
 func (s *Server) AdminHandler(static fs.FS) http.Handler {
 	mux := http.NewServeMux()
+	s.apiRoutes(mux)
+	s.adminTokenRoutes(mux)
+	mux.Handle("/", spa(static))
+	s.Auth.Routes(mux)
+	return s.guard(mux)
+}
+
+// apiRoutes registers the workspace / token / browse API shared by the panel
+// and remote admin. Auth is the caller's job.
+func (s *Server) apiRoutes(mux *http.ServeMux) {
 	fail := func(w http.ResponseWriter, err error) {
 		writeJSON(w, 400, map[string]any{"ok": false, "error": err.Error()})
 	}
@@ -60,9 +71,6 @@ func (s *Server) AdminHandler(static fs.FS) http.Handler {
 		}
 		writeJSON(w, 200, map[string]any{"ok": true})
 	})
-	mux.Handle("/", spa(static))
-	s.Auth.Routes(mux)
-
 	mux.HandleFunc("GET /api/state", func(w http.ResponseWriter, r *http.Request) {
 		ws, ts := s.Store.Snapshot()
 		type tokView struct {
@@ -197,7 +205,7 @@ func (s *Server) AdminHandler(static fs.FS) http.Handler {
 			writeJSON(w, 409, map[string]any{"ok": false, "error": err.Error()})
 			return
 		}
-		s.ops.add(opEntry{At: time.Now(), Who: "你", WS: ws.Name, Op: "merge", Target: t.Label, OK: true})
+		s.ops.add(opEntry{At: time.Now(), Who: actor(r), WS: ws.Name, Op: "merge", Target: t.Label, OK: true})
 		writeJSON(w, 200, map[string]any{"ok": true, "output": out})
 	})
 
@@ -252,10 +260,9 @@ func (s *Server) AdminHandler(static fs.FS) http.Handler {
 			writeJSON(w, 400, map[string]any{"ok": false, "error": msg})
 			return
 		}
-		s.ops.add(opEntry{At: time.Now(), Who: "你", Op: "mkdir", Target: p, OK: true})
+		s.ops.add(opEntry{At: time.Now(), Who: actor(r), Op: "mkdir", Target: p, OK: true})
 		writeJSON(w, 200, map[string]any{"ok": true, "path": p})
 	})
-	return s.guard(mux)
 }
 
 // guard keeps the panel API behind the panel login (see auth.go) and

@@ -56,3 +56,18 @@
 `POST /api/mkdir` (`{parent, name}`, 选目录时新建文件夹)。
 
 在线 = 3 分钟内有请求且没有登出。删除令牌立即生效。
+
+## 远程管理 (`/admin/v1/*`, 走公网 agent 地址)
+
+默认关闭: 只有在本机面板 "远程管理" 里建了管理令牌才可用。管理令牌形如 `hxadm_...`,
+只存 sha256, 创建时显示一次; 带 `Authorization: Bearer <管理令牌>`。
+
+- `GET /admin/v1/hello` → `{server, admin, public_url}`
+- 其余路径等于面板 API 去掉 `/api/` 前缀, 只开放这些:
+  `GET state`, `GET ops`, `GET tunnel`, `GET browse?path=`, `POST mkdir`,
+  `POST workspaces`, `PATCH/DELETE workspaces/{id}`, `POST workspaces/{id}/tokens`,
+  `GET tokens/{id}/prompt`, `DELETE tokens/{id}`, `POST tokens/{id}/merge`。
+- 不开放: 管理令牌本身, 隧道设置, 面板账号 (403)。
+- 令牌错误按 IP 计数, 连续 5 次起锁定 (每多一次加 1 分钟, 429)。写操作和失败都记进操作记录, 身份为 `管理:<名字>`。
+
+面板接口: `GET/POST /api/admin-tokens` (`{label}` → `{secret, base}`), `DELETE /api/admin-tokens/{id}`。
