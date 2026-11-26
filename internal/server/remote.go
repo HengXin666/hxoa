@@ -17,14 +17,17 @@ import (
 	"github.com/HengXin666/hxoa/internal/proto"
 )
 
-// Remote admin: the panel API reachable through the tunnel at /admin/v1/*
+// Remote admin: the panel API reachable through the tunnel at /v1/admin/*
+// (under /v1/ so a reverse proxy that already sends /v1/ to the agent port
+// needs no new rule; /admin/v1/* from 2.4.0 stays as an alias)
 // with an admin token, so another app (e.g. HX-AIOA on a phone) can manage
 // workspaces and connection tokens. Off until the user mints a token in the
 // panel; only the hash is stored. Minting admin tokens and tunnel / account
 // settings stay local-only.
 
 const (
-	adminPrefix     = "/admin/v1/"
+	adminPrefix     = "/v1/admin/"
+	adminPrefixOld  = "/admin/v1/"
 	adminSecretPre  = "hxadm_"
 	remoteFailLimit = 5
 	remoteLockStep  = time.Minute
@@ -237,7 +240,7 @@ func (l *remoteLimiter) ok(ip string) {
 	delete(l.fails, ip)
 }
 
-// RemoteAdminHandler serves /admin/v1/* on the agent listener.
+// RemoteAdminHandler serves /v1/admin/* (and the 2.4.0 alias /admin/v1/*) on the agent listener.
 func (s *Server) RemoteAdminHandler() http.Handler {
 	api := http.NewServeMux()
 	s.apiRoutes(api)
@@ -255,7 +258,7 @@ func (s *Server) RemoteAdminHandler() http.Handler {
 			return
 		}
 		s.remote.ok(ip)
-		rest := strings.TrimPrefix(r.URL.Path, adminPrefix)
+		rest := strings.TrimPrefix(strings.TrimPrefix(r.URL.Path, adminPrefix), adminPrefixOld)
 		who := "管理:" + a.Label
 		if rest == "hello" && r.Method == "GET" {
 			writeJSON(w, 200, map[string]any{"ok": true, "server": ServerVersion, "admin": a.Label, "public_url": s.PublicURL()})

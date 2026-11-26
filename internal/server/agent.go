@@ -12,7 +12,7 @@ import (
 	"github.com/HengXin666/hxoa/internal/proto"
 )
 
-const ServerVersion = "hxoad/2.4.0"
+const ServerVersion = "hxoad/2.4.1"
 
 type Server struct {
 	Store  *Store
@@ -283,7 +283,9 @@ func (s *Server) AgentHandler() http.Handler {
 		w.Header().Set("Content-Type", "application/gzip")
 		return q.Get("path"), writeTar(c.root, q.Get("path"), w, q.Get("all") != "1")
 	})
-	mux.Handle(adminPrefix, s.RemoteAdminHandler())
+	admin := s.RemoteAdminHandler()
+	mux.Handle(adminPrefix, admin)
+	mux.Handle(adminPrefixOld, admin)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 404, proto.Error{Error: "hxoad agent API; 用 hxoa 客户端连接", Code: proto.CodeNotFound})
 	})

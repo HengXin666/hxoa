@@ -68,7 +68,7 @@ export default function RemoteAdminView({ run, publicUrl }: { run: Run; publicUr
         <div className="grid gap-1">
           <div className="font-medium">默认关闭, 有管理令牌才开放</div>
           <div className="text-muted-foreground">
-            管理令牌可以经公网地址 <Mono>{publicUrl || "(隧道未就绪)"}/admin/v1/</Mono> 管理工作区, 连接令牌, 目录选择和合并, 等于这台机器的远程控制权。不能远程创建管理令牌, 也不能改隧道和面板账号。连续输错 5 次会按 IP 锁定。
+            管理令牌可以经公网地址 <Mono>{publicUrl || "(隧道未就绪)"}/v1/admin/</Mono> 管理工作区, 连接令牌, 目录选择和合并, 等于这台机器的远程控制权。不能远程创建管理令牌, 也不能改隧道和面板账号。连续输错 5 次会按 IP 锁定。
           </div>
         </div>
       </div>

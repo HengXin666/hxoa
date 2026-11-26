@@ -34,7 +34,7 @@ func adminDo(s *Server, method, path, token, body string) (*httptest.ResponseRec
 
 func TestRemoteAdmin(t *testing.T) {
 	s, root := remoteServer(t)
-	if w, _ := adminDo(s, "GET", "/admin/v1/state", "", ""); w.Code != 401 {
+	if w, _ := adminDo(s, "GET", "/v1/admin/state", "", ""); w.Code != 401 {
 		t.Fatal("no token", w.Code)
 	}
 	secret, a, err := s.Store.AddAdminToken("aioa")
@@ -45,38 +45,41 @@ func TestRemoteAdmin(t *testing.T) {
 	if strings.Contains(string(raw), secret) {
 		t.Fatal("secret stored in plain text")
 	}
-	if w, out := adminDo(s, "GET", "/admin/v1/hello", secret, ""); w.Code != 200 || out["admin"] != "aioa" {
+	if w, out := adminDo(s, "GET", "/v1/admin/hello", secret, ""); w.Code != 200 || out["admin"] != "aioa" {
 		t.Fatal("hello", w.Code, out)
 	}
-	if w, _ := adminDo(s, "POST", "/admin/v1/mkdir", secret, `{"parent":"`+root+`","name":"proj"}`); w.Code != 200 {
+	if w, _ := adminDo(s, "GET", "/admin/v1/hello", secret, ""); w.Code != 200 {
+		t.Fatal("2.4.0 alias", w.Code)
+	}
+	if w, _ := adminDo(s, "POST", "/v1/admin/mkdir", secret, `{"parent":"`+root+`","name":"proj"}`); w.Code != 200 {
 		t.Fatal("mkdir", w.Code, w.Body.String())
 	}
-	w, out := adminDo(s, "POST", "/admin/v1/workspaces", secret, `{"name":"p","path":"`+filepath.Join(root, "proj")+`","exec":false}`)
+	w, out := adminDo(s, "POST", "/v1/admin/workspaces", secret, `{"name":"p","path":"`+filepath.Join(root, "proj")+`","exec":false}`)
 	if w.Code != 200 {
 		t.Fatal("add workspace", w.Code, w.Body.String())
 	}
 	wsID := out["workspace"].(map[string]any)["id"].(string)
-	w, out = adminDo(s, "POST", "/admin/v1/workspaces/"+wsID+"/tokens", secret, `{"label":"hark"}`)
+	w, out = adminDo(s, "POST", "/v1/admin/workspaces/"+wsID+"/tokens", secret, `{"label":"hark"}`)
 	if w.Code != 200 || !strings.Contains(out["prompt"].(string), "https://hx.example") {
 		t.Fatal("token", w.Code, out)
 	}
 	tokID := out["token"].(map[string]any)["id"].(string)
-	if w, out := adminDo(s, "GET", "/admin/v1/tokens/"+tokID+"/prompt", secret, ""); w.Code != 200 || out["prompt"] == "" {
+	if w, out := adminDo(s, "GET", "/v1/admin/tokens/"+tokID+"/prompt", secret, ""); w.Code != 200 || out["prompt"] == "" {
 		t.Fatal("prompt", w.Code)
 	}
-	for _, p := range [][2]string{{"POST", "/admin/v1/admin-tokens"}, {"POST", "/admin/v1/tunnel/token"}, {"POST", "/admin/v1/account"}, {"GET", "/admin/v1/admin-tokens"}} {
+	for _, p := range [][2]string{{"POST", "/v1/admin/admin-tokens"}, {"POST", "/v1/admin/tunnel/token"}, {"POST", "/v1/admin/account"}, {"GET", "/v1/admin/admin-tokens"}} {
 		if w, _ := adminDo(s, p[0], p[1], secret, `{}`); w.Code != 403 {
 			t.Fatal("should be refused", p, w.Code)
 		}
 	}
-	if w, _ := adminDo(s, "DELETE", "/admin/v1/tokens/"+tokID, secret, ""); w.Code != 200 {
+	if w, _ := adminDo(s, "DELETE", "/v1/admin/tokens/"+tokID, secret, ""); w.Code != 200 {
 		t.Fatal("delete token", w.Code)
 	}
-	if w, _ := adminDo(s, "DELETE", "/admin/v1/workspaces/"+wsID, secret, ""); w.Code != 200 {
+	if w, _ := adminDo(s, "DELETE", "/v1/admin/workspaces/"+wsID, secret, ""); w.Code != 200 {
 		t.Fatal("delete ws", w.Code)
 	}
 	s.Store.DeleteAdminToken(a.ID)
-	if w, _ := adminDo(s, "GET", "/admin/v1/state", secret, ""); w.Code != 401 {
+	if w, _ := adminDo(s, "GET", "/v1/admin/state", secret, ""); w.Code != 401 {
 		t.Fatal("revoked token still works", w.Code)
 	}
 }
@@ -85,9 +88,9 @@ func TestRemoteAdminLockout(t *testing.T) {
 	s, _ := remoteServer(t)
 	secret, _, _ := s.Store.AddAdminToken("aioa")
 	for i := 0; i < remoteFailLimit; i++ {
-		adminDo(s, "GET", "/admin/v1/state", "hxadm_wrong", "")
+		adminDo(s, "GET", "/v1/admin/state", "hxadm_wrong", "")
 	}
-	if w, _ := adminDo(s, "GET", "/admin/v1/state", secret, ""); w.Code != 429 {
+	if w, _ := adminDo(s, "GET", "/v1/admin/state", secret, ""); w.Code != 429 {
 		t.Fatal("expected lockout", w.Code)
 	}
 }
