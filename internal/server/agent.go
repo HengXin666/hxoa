@@ -12,7 +12,7 @@ import (
 	"github.com/HengXin666/hxoa/internal/proto"
 )
 
-const ServerVersion = "hxoad/2.4.1"
+const ServerVersion = "hxoad/2.5.0"
 
 type Server struct {
 	Store  *Store
@@ -150,8 +150,25 @@ func (s *Server) AgentHandler() http.Handler {
 			mode = "worker"
 		}
 		writeJSON(w, 200, proto.Hello{OK: true, Server: ServerVersion, Proto: proto.Version, Workspace: c.ws.Name,
-			Identity: c.tok.Label, Root: c.root, Mode: mode, Branch: c.branch, Base: c.base, Exec: c.ws.Exec})
+			Identity: c.tok.Label, Root: c.root, Mode: mode, Branch: c.branch, Base: c.base, Exec: c.ws.Exec, Task: c.tok.Task.wire()})
 		return "", nil
+	})
+	h("/v1/task", "task", func(w http.ResponseWriter, r *http.Request, c *reqCtx) (string, error) {
+		if r.Method == http.MethodGet {
+			writeJSON(w, 200, map[string]any{"ok": true, "task": c.tok.Task.wire()})
+			return "", nil
+		}
+		var req proto.TaskReq
+		if err := decode(r, &req); err != nil {
+			return "", err
+		}
+		t, err := cleanTask(req.Issues, req.Note, "agent")
+		if err != nil {
+			return "", errf(proto.CodeBadRequest, err.Error())
+		}
+		s.Store.SetTask(c.tok.ID, t)
+		writeJSON(w, 200, map[string]any{"ok": true, "task": t.wire()})
+		return taskText(t), nil
 	})
 	h("/v1/bye", "bye", func(w http.ResponseWriter, r *http.Request, c *reqCtx) (string, error) {
 		s.Store.Bye(c.secret)

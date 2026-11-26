@@ -129,6 +129,7 @@ type WorkerStatus struct {
 	Behind  string   `json:"behind"` // commits on base not on worker
 	Dirty   []string `json:"dirty"`  // uncommitted files in the worktree
 	BaseRef string   `json:"base"`
+	Refs    []int    `json:"refs,omitempty"` // issues named in unmerged commits
 }
 
 func workerStatus(ws *Workspace, t *Token) WorkerStatus {
@@ -145,6 +146,7 @@ func workerStatus(ws *Workspace, t *Token) WorkerStatus {
 			st.Behind, st.Ahead = f[0], f[1]
 		}
 	}
+	st.Refs = workerRefs(ws, st.Branch)
 	if out, err := git(dir, "status", "--porcelain"); err == nil && out != "" {
 		for _, l := range strings.Split(out, "\n") {
 			st.Dirty = append(st.Dirty, strings.TrimSpace(l))

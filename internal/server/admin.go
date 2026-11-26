@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/HengXin666/hxoa/internal/proto"
 )
 
 // AdminHandler serves the local panel and its API. It must only be reachable
@@ -82,6 +84,7 @@ func (s *Server) apiRoutes(mux *http.ServeMux) {
 			Workspace
 			Git    bool      `json:"git"`
 			Branch string    `json:"branch,omitempty"`
+			Repo   string    `json:"repo,omitempty"`
 			Online int       `json:"online"`
 			Tokens []tokView `json:"tokens"`
 		}
@@ -90,6 +93,7 @@ func (s *Server) apiRoutes(mux *http.ServeMux) {
 			v := wsView{Workspace: w, Git: isGitRepo(w.Path), Tokens: []tokView{}}
 			if v.Git {
 				v.Branch = w.Branch()
+				v.Repo = repoURL(w.Path)
 			}
 			for _, t := range ts {
 				if t.Workspace != w.ID {
@@ -207,6 +211,32 @@ func (s *Server) apiRoutes(mux *http.ServeMux) {
 		}
 		s.ops.add(opEntry{At: time.Now(), Who: actor(r), WS: ws.Name, Op: "merge", Target: t.Label, OK: true})
 		writeJSON(w, 200, map[string]any{"ok": true, "output": out})
+	})
+
+	mux.HandleFunc("GET /api/workspaces/{id}/issues", func(w http.ResponseWriter, r *http.Request) {
+		ws := s.Store.Workspace(r.PathValue("id"))
+		if ws == nil {
+			writeJSON(w, 404, map[string]any{"ok": false, "error": "工作区不存在"})
+			return
+		}
+		writeJSON(w, 200, map[string]any{"ok": true, "issues": repoIssues(repoURL(ws.Path))})
+	})
+	mux.HandleFunc("PUT /api/tokens/{id}/task", func(w http.ResponseWriter, r *http.Request) {
+		var in proto.TaskReq
+		json.NewDecoder(r.Body).Decode(&in)
+		t, ws := s.Store.TokenByID(r.PathValue("id"))
+		if t == nil || ws == nil {
+			writeJSON(w, 404, map[string]any{"ok": false, "error": "连接不存在"})
+			return
+		}
+		task, err := cleanTask(in.Issues, in.Note, "user")
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		s.Store.SetTask(t.ID, task)
+		s.ops.add(opEntry{At: time.Now(), Who: actor(r), WS: ws.Name, Op: "task", Target: t.Label + " " + taskText(task), OK: true})
+		writeJSON(w, 200, map[string]any{"ok": true, "task": task})
 	})
 
 	// Directory picker for choosing a workspace location.
@@ -341,7 +371,7 @@ func (s *Server) Prompt(ws *Workspace, t *Token) string {
 		"hxoa --base " + base + " --login " + t.Secret + "\n" +
 		"装完直接 hxoa ls 就能看到我的文件, 连的是本机这一个工作区"
 	if ws.Workers {
-		p += "\n\n开了并行编辑: 你在自己的 git 工作树 (分支 " + workerBranch(t) + ") 里改, 做完一段就 commit 并告诉我, 我在面板上合并。"
+		p += "\n\n开了并行编辑: 你在自己的 git 工作树 (分支 " + workerBranch(t) + ") 里改, 做完一段就 commit 并告诉我, 我在面板上合并。开始做某个 issue 先 hxoa task <号> 登记, 提交说明里写上 #号。"
 	}
 	return p
 }

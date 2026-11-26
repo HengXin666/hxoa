@@ -57,6 +57,22 @@ type Hello struct {
 	Branch    string `json:"branch,omitempty"`
 	Base      string `json:"base_branch,omitempty"`
 	Exec      bool   `json:"exec"`
+	Task      *Task  `json:"task,omitempty"`
+}
+
+// Task is what a connection is working on (issue numbers and a note), shown
+// on the panel so the user can see who is doing what.
+type Task struct {
+	Issues []int  `json:"issues,omitempty"`
+	Note   string `json:"note,omitempty"`
+	By     string `json:"by,omitempty"` // "agent" or "user"
+	At     string `json:"at,omitempty"`
+}
+
+// TaskReq sets the task; empty issues and note clear it.
+type TaskReq struct {
+	Issues []int  `json:"issues"`
+	Note   string `json:"note"`
 }
 
 type Entry struct {

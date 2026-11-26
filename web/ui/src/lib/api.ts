@@ -38,6 +38,14 @@ export interface WorkerStatus {
   ahead?: string;
   behind?: string;
   dirty?: string[];
+  refs?: number[];
+}
+
+export interface Task {
+  issues?: number[];
+  note?: string;
+  by?: "agent" | "user";
+  at: string;
 }
 
 export interface TokenView {
@@ -50,6 +58,7 @@ export interface TokenView {
   last_ip?: string;
   ops: number;
   worker?: WorkerStatus;
+  task?: Task;
 }
 
 export interface WorkspaceView {
@@ -60,6 +69,7 @@ export interface WorkspaceView {
   exec: boolean;
   git: boolean;
   branch?: string;
+  repo?: string;
   online: number;
   tokens: TokenView[];
 }

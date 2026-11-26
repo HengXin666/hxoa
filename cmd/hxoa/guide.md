@@ -8,6 +8,11 @@ hxoa: 连接用户本机工作区的客户端. 路径都相对于工作区根目
   hxoa status                       看工作区, 身份, 模式 (direct / worker)
   hxoa logout                       断开
 
+任务登记 (用户在面板上看谁在做哪个 issue)
+  hxoa task                         看当前登记的任务 (用户也可能在面板上给你派了)
+  hxoa task 104 108 [-m '一句说明']  开始做某些 issue 时登记, 覆盖旧的
+  hxoa task --clear                 做完, 或不再做了
+
 查看 (省 token: 先 ls/grep 定位, 再按行读)
   hxoa ls [path] [-d 深度] [-m 上限]     目录; 默认 1 层, 跳过 .git node_modules
   hxoa grep <pattern> [path] [-g '*.go'] [-F] [-i] [-m 200]
@@ -47,6 +52,7 @@ hxoa: 连接用户本机工作区的客户端. 路径都相对于工作区根目
   4. 不要凭记忆改: 很久没看过的地方先 cat 那几行再改.
   5. worker 模式: 你在自己的 git 工作树和分支里, 用户的目录不会变.
      做完一段就 hxoa git add -A, hxoa git commit -m '...', 再告诉用户去面板合并.
+     提交说明里写上 issue 号 (如 #104), 面板会按它显示这个分支在做哪些 issue.
      要用户的最新代码: hxoa git merge <基础分支>; 面板报合并冲突时也这样在你的分支里先解决.
   6. direct 模式: 你直接改用户的文件, 用户和本地工具可能同时在改, 尊重冲突.
   7. 不要动 .git 和 .hxoa (服务端也会拒绝写入).

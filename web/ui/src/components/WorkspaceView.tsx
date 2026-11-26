@@ -1,5 +1,5 @@
 import * as React from "react";
-import { AlertTriangle, GitBranch, GitMerge, History, MessageSquareText, Plus, Settings2, Trash2, Users } from "lucide-react";
+import { AlertTriangle, ClipboardList, GitBranch, GitMerge, History, MessageSquareText, Plus, Settings2, Trash2, Users } from "lucide-react";
 import { api, type Op, type TokenView, type WorkspaceView as WS } from "@/lib/api";
 import { ago, cn } from "@/lib/utils";
 import type { Run } from "@/pages/Dashboard";
@@ -12,6 +12,7 @@ import { Mono } from "@/components/ui/mono";
 import { Tip } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import OpsTable from "@/components/OpsCard";
+import { IssueBoard, TaskDialog, TokenIssues } from "@/components/IssueWork";
 
 export default function WorkspaceView({
   ws,
@@ -64,6 +65,10 @@ export default function WorkspaceView({
             <Users />
             连接
           </TabsTrigger>
+          <TabsTrigger value="issues">
+            <ClipboardList />
+            分工
+          </TabsTrigger>
           <TabsTrigger value="settings">
             <Settings2 />
             设置
@@ -75,6 +80,9 @@ export default function WorkspaceView({
         </TabsList>
         <TabsContent value="tokens">
           <Tokens ws={ws} run={run} onPrompt={onPrompt} />
+        </TabsContent>
+        <TabsContent value="issues">
+          <IssueBoard ws={ws} />
         </TabsContent>
         <TabsContent value="settings">
           <SettingsPane ws={ws} run={run} />
@@ -89,6 +97,7 @@ export default function WorkspaceView({
 
 function Tokens({ ws, run, onPrompt }: { ws: WS; run: Run; onPrompt: (label: string, text: string) => void }) {
   const [label, setLabel] = React.useState("");
+  const [editing, setEditing] = React.useState<TokenView | null>(null);
   async function addToken() {
     const l = label.trim();
     if (!l) return;
@@ -104,7 +113,7 @@ function Tokens({ ws, run, onPrompt }: { ws: WS; run: Run; onPrompt: (label: str
       <div className="bg-card divide-y rounded-xl border">
         {ws.tokens.length === 0 && <p className="text-muted-foreground px-4 py-6 text-center text-sm">还没有连接。在下面给 AI 起个名字, 新建一个。</p>}
         {ws.tokens.map((t) => (
-          <TokenRow key={t.id} t={t} run={run} onPrompt={onPrompt} />
+          <TokenRow key={t.id} t={t} repo={ws.repo} run={run} onPrompt={onPrompt} onEdit={() => setEditing(t)} />
         ))}
         <form
           className="flex gap-2 px-4 py-3"
@@ -120,11 +129,24 @@ function Tokens({ ws, run, onPrompt }: { ws: WS; run: Run; onPrompt: (label: str
           </Button>
         </form>
       </div>
+      <TaskDialog t={editing} run={run} onClose={() => setEditing(null)} />
     </div>
   );
 }
 
-function TokenRow({ t, run, onPrompt }: { t: TokenView; run: Run; onPrompt: (label: string, text: string) => void }) {
+function TokenRow({
+  t,
+  repo,
+  run,
+  onPrompt,
+  onEdit,
+}: {
+  t: TokenView;
+  repo?: string;
+  run: Run;
+  onPrompt: (label: string, text: string) => void;
+  onEdit: () => void;
+}) {
   const confirm = useConfirm();
   const k = t.worker;
   const canMerge = !!k?.exists && (Number(k.ahead || 0) > 0 || (k.dirty ?? []).length > 0);
@@ -154,6 +176,7 @@ function TokenRow({ t, run, onPrompt }: { t: TokenView; run: Run; onPrompt: (lab
             )}
           </div>
         )}
+        <TokenIssues t={t} repo={repo} onEdit={onEdit} />
       </div>
       <div className="flex gap-1">
         <Button

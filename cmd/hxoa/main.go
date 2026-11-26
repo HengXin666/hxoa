@@ -340,6 +340,8 @@ func run(args []string) error {
 		return cmdJob(c, rest)
 	case "pull":
 		return cmdPull(c, rest)
+	case "task":
+		return cmdTask(c, rest)
 	}
 	return usage("未知命令 " + cmd + ", 运行 hxoa guide 查看用法")
 }
@@ -372,6 +374,9 @@ func printHello(h *proto.Hello) {
 		fmt.Print(", 命令执行已关闭")
 	}
 	fmt.Printf("\n根目录 %s\n", h.Root)
+	if h.Task != nil {
+		printTask(h.Task)
+	}
 	fmt.Println("首次使用先跑 hxoa guide 看规则 (写入前必须先读, 冲突重读再改)")
 	if h.Proto != proto.Version {
 		fmt.Printf("注意: 服务端协议 %d, 客户端 %d, 请更新\n", h.Proto, proto.Version)

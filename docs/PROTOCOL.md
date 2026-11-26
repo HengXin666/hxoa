@@ -32,6 +32,7 @@
 | POST `/v1/exec` | `{cmd, dir, timeout, bg, stdin}` → `{code, stdout, stderr, ms, timed_out}` 或 `{job}` |
 | GET `/v1/job?id=&wait=&kill=1` | 后台任务状态和输出 |
 | GET `/v1/tar?path=&all=1` | 目录的 tar.gz |
+| GET/POST `/v1/task` | 看 / 登记这个连接在做的事 `{issues:[104], note}`; 两者都空即清空 → `{task}`。hello 也带 `task` |
 
 ### patch
 
@@ -53,7 +54,9 @@
 `GET /api/state`, `GET /api/ops`, `POST/PATCH/DELETE /api/workspaces[/{id}]`,
 `POST /api/workspaces/{id}/tokens`, `GET /api/tokens/{id}/prompt`,
 `DELETE /api/tokens/{id}`, `POST /api/tokens/{id}/merge`, `GET /api/browse?path=`,
-`POST /api/mkdir` (`{parent, name}`, 选目录时新建文件夹)。
+`POST /api/mkdir` (`{parent, name}`, 选目录时新建文件夹), `PUT /api/tokens/{id}/task` (用户给连接派活, 格式同 `/v1/task`)。
+
+分工: `GET /api/state` 的工作区带 `repo` (origin 在 GitHub 时的页面地址), 连接带 `task` (`{issues, note, by: agent|user, at}`), worker 带 `refs` (未合并提交说明里出现的 `#号`)。`GET /api/workspaces/{id}/issues` → `{issues:{"104":{title,state}}}`, 用本机 `gh` 登录读, 缓存 5 分钟; 没装 gh 时为空, 面板改从浏览器问 GitHub。
 
 在线 = 3 分钟内有请求且没有登出。删除令牌立即生效。
 
@@ -66,7 +69,7 @@
 - 其余路径等于面板 API 去掉 `/api/` 前缀, 只开放这些:
   `GET state`, `GET ops`, `GET tunnel`, `GET browse?path=`, `POST mkdir`,
   `POST workspaces`, `PATCH/DELETE workspaces/{id}`, `POST workspaces/{id}/tokens`,
-  `GET tokens/{id}/prompt`, `DELETE tokens/{id}`, `POST tokens/{id}/merge`。
+  `GET tokens/{id}/prompt`, `DELETE tokens/{id}`, `POST tokens/{id}/merge`, `PUT tokens/{id}/task`, `GET workspaces/{id}/issues`。
 - 不开放: 管理令牌本身, 隧道设置, 面板账号 (403)。
 - 令牌错误按 IP 计数, 连续 5 次起锁定 (每多一次加 1 分钟, 429)。写操作和失败都记进操作记录, 身份为 `管理:<名字>`。
 

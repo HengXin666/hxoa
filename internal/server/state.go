@@ -36,6 +36,7 @@ type Token struct {
 	LastIP    string    `json:"last_ip,omitempty"`
 	Ops       int64     `json:"ops"`
 	Bye       bool      `json:"bye,omitempty"` // client logged out; next request revives it
+	Task      *Task     `json:"task,omitempty"`
 }
 
 // TunnelConfig is how hxoad exposes the agent API. The Cloudflare API token

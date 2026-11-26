@@ -173,6 +173,8 @@ var remoteAllowed = []struct {
 	{"GET", regexp.MustCompile(`^tokens/[0-9a-f]+/prompt$`)},
 	{"DELETE", regexp.MustCompile(`^tokens/[0-9a-f]+$`)},
 	{"POST", regexp.MustCompile(`^tokens/[0-9a-f]+/merge$`)},
+	{"PUT", regexp.MustCompile(`^tokens/[0-9a-f]+/task$`)},
+	{"GET", regexp.MustCompile(`^workspaces/[0-9a-f]+/issues$`)},
 }
 
 func remoteAllow(method, rest string) bool {
