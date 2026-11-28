@@ -83,7 +83,7 @@ func shell() string {
 	return "/bin/sh"
 }
 
-func startJob(root, owner string, req *proto.ExecReq) (*job, error) {
+func startJob(root, owner string, req *proto.ExecReq, onDone func(*job)) (*job, error) {
 	dir := root
 	if req.Dir != "" {
 		d, err := resolve(root, req.Dir, false)
@@ -128,6 +128,9 @@ func startJob(root, owner string, req *proto.ExecReq) (*job, error) {
 			}
 		}
 		j.ended = time.Now()
+		if onDone != nil {
+			onDone(j)
+		}
 		close(j.done)
 		// forget finished jobs after a while
 		time.AfterFunc(30*time.Minute, func() { jobs.Delete(j.id) })
@@ -153,11 +156,11 @@ func (j *job) reply() *proto.ExecReply {
 	return r
 }
 
-func doExec(root, owner string, req *proto.ExecReq) (*proto.ExecReply, error) {
+func doExec(root, owner string, req *proto.ExecReq, onDone func(*job)) (*proto.ExecReply, error) {
 	if strings.TrimSpace(req.Cmd) == "" {
 		return nil, errf(proto.CodeBadRequest, "命令为空")
 	}
-	j, err := startJob(root, owner, req)
+	j, err := startJob(root, owner, req, onDone)
 	if err != nil {
 		return nil, err
 	}

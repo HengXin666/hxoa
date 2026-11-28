@@ -67,12 +67,16 @@ type Task struct {
 	Note   string `json:"note,omitempty"`
 	By     string `json:"by,omitempty"` // "agent" or "user"
 	At     string `json:"at,omitempty"`
+	// Paths are the directories this connection claims; writes by others
+	// into them get a reminder to tell this connection with hxoa say.
+	Paths []string `json:"paths,omitempty"`
 }
 
 // TaskReq sets the task; empty issues and note clear it.
 type TaskReq struct {
-	Issues []int  `json:"issues"`
-	Note   string `json:"note"`
+	Issues []int    `json:"issues"`
+	Note   string   `json:"note"`
+	Paths  []string `json:"paths,omitempty"`
 }
 
 type Entry struct {
@@ -178,6 +182,9 @@ type ExecReq struct {
 	Timeout int    `json:"timeout,omitempty"`
 	Bg      bool   `json:"bg,omitempty"`
 	Stdin   string `json:"stdin,omitempty"`
+	// SkipCheck lets a git commit through without the workspace's checks;
+	// the panel marks the connection red.
+	SkipCheck bool `json:"skip_check,omitempty"`
 }
 
 type ExecReply struct {
@@ -197,3 +204,36 @@ func (r *WriteReq) Target() string { return r.Path }
 func (r *PatchReq) Target() string { return r.Path }
 func (r *RmReq) Target() string    { return r.Path }
 func (r *MvReq) Target() string    { return r.From }
+
+// NoticeHeader carries piggybacked notices (messages from other workers,
+// directory notes, overlap warnings) on any agent response: base64 of a JSON
+// array of strings. The client prints each to stderr as "# ...".
+const NoticeHeader = "X-Hxoa-Notice"
+
+// SayReq sends a short message to other workers of the same workspace; To
+// is a label, empty means everyone else.
+type SayReq struct {
+	Text string `json:"text"`
+	To   string `json:"to,omitempty"`
+}
+
+// LearnReq files a one-line lesson into the workspace memory's inbox; the
+// user adopts or drops it from the panel.
+type LearnReq struct {
+	Text string `json:"text"`
+}
+
+// BriefReply is the start-of-work pack: project brief, adopted lessons,
+// who claims what, and the three things to remember.
+type BriefReply struct {
+	OK   bool   `json:"ok"`
+	Text string `json:"text"`
+}
+
+// CheckResult is one entry of the workspace's checks.yml run before a commit.
+type CheckResult struct {
+	Name   string `json:"name"`
+	OK     bool   `json:"ok"`
+	Ran    bool   `json:"ran"` // false: no changed file under its paths
+	Output string `json:"output,omitempty"`
+}

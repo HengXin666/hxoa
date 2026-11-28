@@ -1,5 +1,5 @@
 import * as React from "react";
-import { AlertTriangle, ClipboardList, GitBranch, GitMerge, History, MessageSquareText, Plus, Settings2, Trash2, Users } from "lucide-react";
+import { AlertTriangle, BookOpen, ClipboardList, GitBranch, GitMerge, History, MessageSquareText, Plus, Settings2, Trash2, Users } from "lucide-react";
 import { api, type Op, type TokenView, type WorkspaceView as WS } from "@/lib/api";
 import { ago, cn } from "@/lib/utils";
 import type { Run } from "@/pages/Dashboard";
@@ -13,6 +13,7 @@ import { Tip } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import OpsTable from "@/components/OpsCard";
 import { IssueBoard, TaskDialog, TokenIssues } from "@/components/IssueWork";
+import MemoryView from "@/components/MemoryView";
 
 export default function WorkspaceView({
   ws,
@@ -69,6 +70,10 @@ export default function WorkspaceView({
             <ClipboardList />
             分工
           </TabsTrigger>
+          <TabsTrigger value="memory">
+            <BookOpen />
+            协作记忆
+          </TabsTrigger>
           <TabsTrigger value="settings">
             <Settings2 />
             设置
@@ -83,6 +88,9 @@ export default function WorkspaceView({
         </TabsContent>
         <TabsContent value="issues">
           <IssueBoard ws={ws} />
+        </TabsContent>
+        <TabsContent value="memory">
+          <MemoryView ws={ws} run={run} />
         </TabsContent>
         <TabsContent value="settings">
           <SettingsPane ws={ws} run={run} />

@@ -46,6 +46,26 @@ export interface Task {
   note?: string;
   by?: "agent" | "user";
   at: string;
+  paths?: string[];
+}
+
+export interface CheckState {
+  at: string;
+  ok: boolean;
+  skipped?: boolean;
+  failed?: string[];
+}
+
+export interface MemoryInfo {
+  dir: string;
+  projects: string[];
+  root: string;
+  remote?: string;
+  brief_lines?: number;
+  brief_max?: number;
+  checks?: string[];
+  inbox?: string[];
+  threads?: string[];
 }
 
 export interface TokenView {
@@ -59,6 +79,7 @@ export interface TokenView {
   ops: number;
   worker?: WorkerStatus;
   task?: Task;
+  check?: CheckState;
 }
 
 export interface WorkspaceView {

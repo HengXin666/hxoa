@@ -6,6 +6,7 @@ import type { Run } from "@/pages/Dashboard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Mono } from "@/components/ui/mono";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // Who is on which issue: a connection's own registration (hxoa task, or the
@@ -113,7 +114,17 @@ export function TokenIssues({ t, repo, onEdit }: { t: TokenView; repo?: string; 
       {extra.map((n) => (
         <IssueChip key={n} n={n} repo={repo} faint title="只在提交里出现, 没登记" />
       ))}
+      {t.task?.paths?.map((p) => (
+        <Badge key={p} variant="outline" title="认领的目录, 别人改到会被提醒">
+          <Mono className="text-xs">{p}</Mono>
+        </Badge>
+      ))}
       {t.task?.note && <span className="text-muted-foreground">{t.task.note}</span>}
+      {t.check && (
+        <Badge variant={t.check.ok && !t.check.skipped ? "success" : "destructive"} title={`最近一次 commit 门禁, ${ago(t.check.at)}`}>
+          {t.check.skipped ? "跳过了 checks" : t.check.ok ? "checks 通过" : `checks 没过: ${(t.check.failed ?? []).join(" ")}`}
+        </Badge>
+      )}
       {t.task && (
         <span className="text-muted-foreground/70">
           · {t.task.by === "user" ? "你派的" : "它登记的"} {ago(t.task.at)}
@@ -130,9 +141,11 @@ export function TokenIssues({ t, repo, onEdit }: { t: TokenView; repo?: string; 
 export function TaskDialog({ t, run, onClose }: { t: TokenView | null; run: Run; onClose: () => void }) {
   const [issues, setIssues] = React.useState("");
   const [note, setNote] = React.useState("");
+  const [paths, setPaths] = React.useState("");
   React.useEffect(() => {
     setIssues((t?.task?.issues ?? []).join(" "));
     setNote(t?.task?.note ?? "");
+    setPaths((t?.task?.paths ?? []).join(", "));
   }, [t]);
   const nums = issues
     .split(/[\s,，#]+/)
@@ -141,7 +154,7 @@ export function TaskDialog({ t, run, onClose }: { t: TokenView | null; run: Run;
   const bad = nums.some((n) => !Number.isInteger(n) || n <= 0);
   const save = (clear: boolean) =>
     run(async () => {
-      await api("PUT", `api/tokens/${t!.id}/task`, clear ? { issues: [], note: "" } : { issues: nums, note });
+      await api("PUT", `api/tokens/${t!.id}/task`, clear ? { issues: [], note: "" } : { issues: nums, note, paths: paths.trim() ? [paths] : [] });
       onClose();
     }, clear ? "已清空" : "已登记");
   return (
@@ -153,13 +166,14 @@ export function TaskDialog({ t, run, onClose }: { t: TokenView | null; run: Run;
         </DialogHeader>
         <Input placeholder="issue 号, 如 104 108" value={issues} onChange={(e) => setIssues(e.target.value)} />
         <Input placeholder="一句说明 (可选)" value={note} maxLength={200} onChange={(e) => setNote(e.target.value)} />
+        <Input placeholder="认领的目录 (可选), 逗号分隔, 如 client/web, protocol" value={paths} onChange={(e) => setPaths(e.target.value)} />
         <DialogFooter>
           {t?.task && (
             <Button variant="outline" onClick={() => save(true)}>
               清空
             </Button>
           )}
-          <Button disabled={bad || (!nums.length && !note.trim())} onClick={() => save(false)}>
+          <Button disabled={bad || (!nums.length && !note.trim() && !paths.trim())} onClick={() => save(false)}>
             保存
           </Button>
         </DialogFooter>

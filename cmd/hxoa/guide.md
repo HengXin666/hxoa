@@ -8,9 +8,16 @@ hxoa: 连接用户本机工作区的客户端. 路径都相对于工作区根目
   hxoa status                       看工作区, 身份, 模式 (direct / worker)
   hxoa logout                       断开
 
-任务登记 (用户在面板上看谁在做哪个 issue)
-  hxoa task                         看当前登记的任务 (用户也可能在面板上给你派了)
-  hxoa task 104 108 [-m '一句说明']  开始做某些 issue 时登记, 覆盖旧的
+协作 (只记 3 个动作, 其余自动)
+  hxoa task 104 --paths client/web [-m '一句说明']
+                                    开工: 登记 issue 和要改的目录 (逗号分隔), 同时打印本项目的 brief
+  hxoa say '做了什么, 影响谁' [--to oa_1]
+                                    改到别人认领的目录, 或改了共用的东西 (协议, 常量) 时说一句
+  hxoa learn '一句能判断对错的规则'   踩坑, 被主人打回时; 进收件箱, 主人采纳后进 brief
+  自动的: 别人的 say, 第一次碰某个目录的注意事项, 改到别人认领目录的提醒, 都在你下一次跑 hxoa 时
+  以 "# ..." 打到 stderr, 看到就照做; git commit 前自动跑项目的 checks.yml, 不过就拒
+  (确实要跳过: hxoa git commit --skip-check ..., 面板会标红).
+  hxoa brief                        再看一遍 brief     hxoa task          看当前登记
   hxoa task --clear                 做完, 或不再做了
 
 查看 (省 token: 先 ls/grep 定位, 再按行读)

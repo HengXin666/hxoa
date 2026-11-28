@@ -51,6 +51,32 @@ docker compose up -d --build
 
 两种模式下写入都有版本校验, 见下。
 
+## 协作记忆 (多个 Agent 一起干活)
+
+hxoa 只负责读写与下发, 项目内容放在一个单独的记忆仓库 (默认 `~/.config/hxoad/memory`, `HXOA_MEMORY` 改位置, `HXOA_MEMORY_REMOTE` 填一个私有 git 仓库就自动拉取与推送):
+
+```
+routes.yml              工作区 id -> 记忆目录 (面板「协作记忆」里配)
+<项目>/brief.md         <=60 行: 是什么, 边界, 验收口径
+<项目>/areas/<目录>.md   按目录的注意事项 (client/web -> client-web.md), 第一次碰时下发
+<项目>/lessons.md       主人采纳过的经验
+<项目>/inbox.md         hxoa learn 写进来, 待审
+<项目>/checks.yml       commit 门禁
+<项目>/threads/         hxoa say 的记录
+```
+
+Agent 只记 3 个动作: `hxoa task 155 --paths client/web` (开工, 登记并打印 brief), `hxoa say '做了什么, 影响谁'` (改到别人认领的目录或共用文件时), `hxoa learn '一句话规则'` (踩坑, 被打回时)。别人的消息, 目录注意事项, 重叠提醒都搭在它下一次 hxoa 调用的响应上打到 stderr, 不用轮询; `git commit` 前自动跑 `checks.yml`:
+
+```yaml
+checks:
+  - name: typecheck
+    run: npm run typecheck
+    paths: [protocol, server, client/web]   # 可选: 改到这些目录才跑
+    timeout: 600
+```
+
+经验只进收件箱, 主人在面板点「采纳」才进 lessons; brief 超过 60 行面板会提示压缩。
+
 ## 防止编辑冲突
 
 - 每次读取都返回文件的 `version` (内容哈希); 按行读取还会返回这几行的 `range_version`。

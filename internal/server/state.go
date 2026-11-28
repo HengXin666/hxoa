@@ -27,16 +27,17 @@ type Workspace struct {
 // Token is one connection identity. Deleting it cuts that agent off at once and
 // drops it from the connection count.
 type Token struct {
-	ID        string    `json:"id"`
-	Secret    string    `json:"secret"`
-	Workspace string    `json:"workspace"`
-	Label     string    `json:"label"` // who the user says this is: "hark", "claude-local"
-	Created   time.Time `json:"created"`
-	LastSeen  time.Time `json:"last_seen,omitempty"`
-	LastIP    string    `json:"last_ip,omitempty"`
-	Ops       int64     `json:"ops"`
-	Bye       bool      `json:"bye,omitempty"` // client logged out; next request revives it
-	Task      *Task     `json:"task,omitempty"`
+	ID        string      `json:"id"`
+	Secret    string      `json:"secret"`
+	Workspace string      `json:"workspace"`
+	Label     string      `json:"label"` // who the user says this is: "hark", "claude-local"
+	Created   time.Time   `json:"created"`
+	LastSeen  time.Time   `json:"last_seen,omitempty"`
+	LastIP    string      `json:"last_ip,omitempty"`
+	Ops       int64       `json:"ops"`
+	Bye       bool        `json:"bye,omitempty"` // client logged out; next request revives it
+	Task      *Task       `json:"task,omitempty"`
+	Check     *CheckState `json:"check,omitempty"` // last commit gate
 }
 
 // TunnelConfig is how hxoad exposes the agent API. The Cloudflare API token
@@ -347,3 +348,16 @@ func (s *Store) SetTunnel(c TunnelConfig) {
 
 // DataDir is where state, logs and a downloaded cloudflared live.
 func (s *Store) DataDir() string { return filepath.Dir(s.path) }
+
+// SetCheck records the last commit gate of a connection.
+func (s *Store) SetCheck(id string, c *CheckState) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, tok := range s.tokens {
+		if tok.ID == id {
+			tok.Check = c
+			s.dirty = true
+			return
+		}
+	}
+}

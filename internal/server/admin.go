@@ -229,7 +229,7 @@ func (s *Server) apiRoutes(mux *http.ServeMux) {
 			writeJSON(w, 404, map[string]any{"ok": false, "error": "连接不存在"})
 			return
 		}
-		task, err := cleanTask(in.Issues, in.Note, "user")
+		task, err := cleanTask(in.Issues, in.Note, in.Paths, "user")
 		if err != nil {
 			fail(w, err)
 			return
@@ -238,6 +238,8 @@ func (s *Server) apiRoutes(mux *http.ServeMux) {
 		s.ops.add(opEntry{At: time.Now(), Who: actor(r), WS: ws.Name, Op: "task", Target: t.Label + " " + taskText(task), OK: true})
 		writeJSON(w, 200, map[string]any{"ok": true, "task": task})
 	})
+
+	s.memoryRoutes(mux)
 
 	// Directory picker for choosing a workspace location.
 	mux.HandleFunc("GET /api/browse", func(w http.ResponseWriter, r *http.Request) {

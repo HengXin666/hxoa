@@ -23,13 +23,13 @@ func TestIssueRefs(t *testing.T) {
 			t.Fatal(in, g)
 		}
 	}
-	if task, err := cleanTask([]int{108, 104, 108}, " 说明 ", "agent"); err != nil || !reflect.DeepEqual(task.Issues, []int{104, 108}) || task.Note != "说明" {
+	if task, err := cleanTask([]int{108, 104, 108}, " 说明 ", nil, "agent"); err != nil || !reflect.DeepEqual(task.Issues, []int{104, 108}) || task.Note != "说明" {
 		t.Fatal(task, err)
 	}
-	if task, err := cleanTask(nil, "  ", "agent"); task != nil || err != nil {
+	if task, err := cleanTask(nil, "  ", nil, "agent"); task != nil || err != nil {
 		t.Fatal("empty should clear", task, err)
 	}
-	if _, err := cleanTask([]int{-1}, "", "agent"); err == nil {
+	if _, err := cleanTask([]int{-1}, "", nil, "agent"); err == nil {
 		t.Fatal("negative issue")
 	}
 }

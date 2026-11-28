@@ -61,6 +61,13 @@ func main() {
 		tun.Start()
 	}
 	srv := &server.Server{Store: store, Tunnel: tun, Auth: auth}
+	memDir := env("HXOA_MEMORY", *data+"/memory")
+	if mem, err := server.OpenMemory(memDir, os.Getenv("HXOA_MEMORY_REMOTE")); err != nil {
+		log.Printf("协作记忆不可用: %v", err)
+	} else {
+		srv.Memory = mem
+		log.Printf("协作记忆 %s", memDir)
+	}
 
 	go func() {
 		log.Printf("agent API on %s", *agentAddr)

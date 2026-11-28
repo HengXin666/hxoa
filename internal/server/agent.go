@@ -12,14 +12,16 @@ import (
 	"github.com/HengXin666/hxoa/internal/proto"
 )
 
-const ServerVersion = "hxoad/2.5.3"
+const ServerVersion = "hxoad/2.6.0"
 
 type Server struct {
 	Store  *Store
 	Tunnel *TunnelManager
-	Auth   *Auth // panel login
+	Auth   *Auth   // panel login
+	Memory *Memory // collaboration memory; nil when it could not be opened
 	ops    opLog
 	remote remoteLimiter
+	collab collab
 }
 
 func (s *Server) PublicURL() string { return s.Tunnel.URL() }
@@ -126,6 +128,7 @@ func (s *Server) AgentHandler() http.Handler {
 			}
 			c.root, c.branch, c.base = root, branch, base
 			r.Body = http.MaxBytesReader(w, r.Body, 64<<20)
+			setNotices(w, s.notices(c, op, peekPaths(r)))
 			target, err := fn(w, r, c)
 			e := opEntry{At: time.Now(), Who: tok.Label, WS: ws.Name, Op: op, Target: target, OK: err == nil}
 			if err != nil {
@@ -162,12 +165,17 @@ func (s *Server) AgentHandler() http.Handler {
 		if err := decode(r, &req); err != nil {
 			return "", err
 		}
-		t, err := cleanTask(req.Issues, req.Note, "agent")
+		t, err := cleanTask(req.Issues, req.Note, req.Paths, "agent")
 		if err != nil {
 			return "", errf(proto.CodeBadRequest, err.Error())
 		}
 		s.Store.SetTask(c.tok.ID, t)
-		writeJSON(w, 200, map[string]any{"ok": true, "task": t.wire()})
+		c.tok.Task = t
+		reply := map[string]any{"ok": true, "task": t.wire()}
+		if t != nil {
+			reply["brief"] = s.Brief(c.ws, c.tok)
+		}
+		writeJSON(w, 200, reply)
 		return taskText(t), nil
 	})
 	// Agent 自己把 worker 分支合进用户当前分支: 与面板的合并相同, 有冲突或用户目录有未提交修改就撤销并报错
@@ -184,6 +192,33 @@ func (s *Server) AgentHandler() http.Handler {
 		}
 		writeJSON(w, 200, map[string]any{"ok": true, "base": c.ws.Branch(), "output": out})
 		return c.ws.Branch(), nil
+	})
+	h("/v1/brief", "brief", func(w http.ResponseWriter, r *http.Request, c *reqCtx) (string, error) {
+		writeJSON(w, 200, proto.BriefReply{OK: true, Text: s.Brief(c.ws, c.tok)})
+		return "", nil
+	})
+	h("/v1/say", "say", func(w http.ResponseWriter, r *http.Request, c *reqCtx) (string, error) {
+		var req proto.SayReq
+		if err := decode(r, &req); err != nil {
+			return "", err
+		}
+		sent, err := s.Say(c, req.Text, req.To)
+		if err != nil {
+			return req.Text, err
+		}
+		writeJSON(w, 200, map[string]any{"ok": true, "to": sent})
+		return req.Text, nil
+	})
+	h("/v1/learn", "learn", func(w http.ResponseWriter, r *http.Request, c *reqCtx) (string, error) {
+		var req proto.LearnReq
+		if err := decode(r, &req); err != nil {
+			return "", err
+		}
+		if err := s.Learn(c, req.Text); err != nil {
+			return req.Text, err
+		}
+		writeJSON(w, 200, map[string]any{"ok": true})
+		return req.Text, nil
 	})
 	h("/v1/bye", "bye", func(w http.ResponseWriter, r *http.Request, c *reqCtx) (string, error) {
 		s.Store.Bye(c.secret)
@@ -290,7 +325,8 @@ func (s *Server) AgentHandler() http.Handler {
 		if err := decode(r, &req); err != nil {
 			return "", err
 		}
-		out, err := doExec(c.root, c.tok.ID, &req)
+		done := s.gate(c, &req)
+		out, err := doExec(c.root, c.tok.ID, &req, done)
 		if err != nil {
 			return req.Cmd, err
 		}
@@ -322,4 +358,43 @@ func (s *Server) AgentHandler() http.Handler {
 		writeJSON(w, 404, proto.Error{Error: "hxoad agent API; 用 hxoa 客户端连接", Code: proto.CodeNotFound})
 	})
 	return mux
+}
+
+// gate wraps a git commit in the project's checks.yml: the checks that cover
+// the changed files run first and the commit only happens when all pass.
+// The returned hook records the outcome on the connection for the panel.
+func (s *Server) gate(c *reqCtx, req *proto.ExecReq) func(*job) {
+	if !isCommit(req.Cmd) {
+		return nil
+	}
+	project := s.Memory.Route(c.ws.ID)
+	if project == "" {
+		return nil
+	}
+	checks := parseChecks(s.Memory.read(project, checksFile))
+	if len(checks) == 0 {
+		return nil
+	}
+	id := c.tok.ID
+	if req.SkipCheck {
+		s.Store.SetCheck(id, &CheckState{At: time.Now(), Skipped: true})
+		return nil
+	}
+	run := applicable(checks, changedFiles(c.root))
+	if len(run) == 0 {
+		return nil
+	}
+	script, extra := gateScript(run, req.Cmd)
+	req.Cmd = script
+	if req.Timeout <= 0 {
+		req.Timeout = defaultTimeout
+	}
+	req.Timeout += extra
+	return func(j *job) {
+		st := &CheckState{At: time.Now(), OK: j.code != gateFailCode}
+		if !st.OK {
+			st.Failed = failedOf(j.stderr.String())
+		}
+		s.Store.SetCheck(id, st)
+	}
 }

@@ -19,6 +19,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -151,6 +152,7 @@ func call(c *config, method, path string, q url.Values, body any, out any) error
 		return err
 	}
 	defer resp.Body.Close()
+	printNotices(resp.Header.Get(proto.NoticeHeader))
 	raw, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode >= 300 {
 		var pe proto.Error
@@ -335,13 +337,27 @@ func run(args []string) error {
 	case "exec", "run":
 		return cmdExec(c, rest)
 	case "git":
-		return cmdExec(c, append([]string{"--", "git"}, quoteAll(rest)...))
+		var pre, gitArgs []string
+		for _, a := range rest {
+			if a == "--skip-check" {
+				pre = append(pre, a)
+			} else {
+				gitArgs = append(gitArgs, a)
+			}
+		}
+		return cmdExec(c, append(append(pre, "--", "git"), quoteAll(gitArgs)...))
 	case "job":
 		return cmdJob(c, rest)
 	case "pull":
 		return cmdPull(c, rest)
 	case "task":
 		return cmdTask(c, rest)
+	case "brief":
+		return cmdBrief(c)
+	case "say":
+		return cmdSay(c, rest)
+	case "learn":
+		return cmdLearn(c, rest)
 	case "merge":
 		return cmdMerge(c)
 	}
@@ -380,6 +396,7 @@ func printHello(h *proto.Hello) {
 		printTask(h.Task)
 	}
 	fmt.Println("首次使用先跑 hxoa guide 看规则 (写入前必须先读, 冲突重读再改)")
+	fmt.Println("开工先 hxoa task <号> --paths <要改的目录>: 登记认领并打印本项目的 brief")
 	if h.Proto != proto.Version {
 		fmt.Printf("注意: 服务端协议 %d, 客户端 %d, 请更新\n", h.Proto, proto.Version)
 	}
@@ -793,6 +810,10 @@ func cmdExec(c *config, args []string) error {
 			i++
 			continue
 		}
+		if a == "--skip-check" {
+			opts = append(opts, a)
+			continue
+		}
 		if len(cmd) == 0 && (a == "--bg" || a == "--stdin" || strings.HasPrefix(a, "--timeout=") || strings.HasPrefix(a, "--dir=")) {
 			opts = append(opts, a)
 			continue
@@ -804,7 +825,7 @@ func cmdExec(c *config, args []string) error {
 	if len(cmd) == 0 {
 		return usage("exec [--timeout 秒] [--dir 子目录] [--bg] [--stdin] <command>")
 	}
-	req := &proto.ExecReq{Cmd: strings.Join(cmd, " "), Timeout: f.num(0, "timeout", "t"), Dir: f.str("dir", "C"), Bg: f.has("bg")}
+	req := &proto.ExecReq{Cmd: strings.Join(cmd, " "), Timeout: f.num(0, "timeout", "t"), Dir: f.str("dir", "C"), Bg: f.has("bg"), SkipCheck: f.has("skip-check")}
 	if req.Timeout == 0 {
 		req.Timeout = 120
 	}
@@ -812,9 +833,24 @@ func cmdExec(c *config, args []string) error {
 		b, _ := io.ReadAll(os.Stdin)
 		req.Stdin = string(b)
 	}
+	// A commit may first run the workspace's checks; run it as a job and
+	// wait in short polls so no single request outlives a proxy's timeout.
+	wait := !req.Bg && commitRe.MatchString(req.Cmd)
+	if wait {
+		req.Bg = true
+	}
 	var r proto.ExecReply
 	if err := call(c, "POST", "/v1/exec", nil, req, &r); err != nil {
 		return err
+	}
+	if wait {
+		meta("commit 前先跑 checks.yml (job %s), 等结果", r.Job)
+		for r.Running {
+			if err := call(c, "GET", "/v1/job", url.Values{"id": {r.Job}, "wait": {"60"}}, nil, &r); err != nil {
+				return err
+			}
+		}
+		return printExec(&r)
 	}
 	if req.Bg {
 		fmt.Println("job " + r.Job)
@@ -822,6 +858,9 @@ func cmdExec(c *config, args []string) error {
 	}
 	return printExec(&r)
 }
+
+// commitRe matches the server's: a git commit anywhere in the command line.
+var commitRe = regexp.MustCompile(`(^|[;&|(\s'])git\s+(-[cC]\s+\S+\s+)*commit\b`)
 
 func cmdJob(c *config, args []string) error {
 	f := parse(args, "wait", "w")

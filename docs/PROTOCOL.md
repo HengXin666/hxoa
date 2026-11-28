@@ -32,7 +32,14 @@
 | POST `/v1/exec` | `{cmd, dir, timeout, bg, stdin}` → `{code, stdout, stderr, ms, timed_out}` 或 `{job}` |
 | GET `/v1/job?id=&wait=&kill=1` | 后台任务状态和输出 |
 | GET `/v1/tar?path=&all=1` | 目录的 tar.gz |
-| GET/POST `/v1/task` | 看 / 登记这个连接在做的事 `{issues:[104], note}`; 两者都空即清空 → `{task}`。hello 也带 `task` |
+| GET/POST `/v1/task` | 看 / 登记这个连接在做的事 `{issues:[104], note, paths:["client/web"]}` (paths 为认领的目录); 全空即清空 → `{task, brief}` (登记时带 brief 全文)。hello 也带 `task` |
+| GET `/v1/brief` | 开工包: 项目 brief, 采纳过的经验, 其他 worker 认领了什么, 3 个动作 → `{text}` |
+| POST `/v1/say` | `{text, to?}` 给同工作区的其他连接 (或叫 to 的那个) 带一句话, 记进记忆的 `threads/` → `{to:[...]}` |
+| POST `/v1/learn` | `{text}` 一句经验进记忆的 `inbox.md`, 主人在面板采纳或丢弃 |
+| POST `/v1/merge` | worker 模式: 把自己的分支合进用户当前分支 (同面板合并) |
+
+任何响应都可能带 `X-Hxoa-Notice`: base64 的 JSON 字符串数组 (别人的 say, 第一次碰某目录的注意事项, 写到别人认领目录的提醒), 客户端逐行以 `# ` 打到 stderr。
+`/v1/exec` 的命令里有 `git commit` 且工作区关联的记忆里有 `checks.yml` 时, 先跑覆盖到改动文件的检查, 全过才执行原命令, 否则退出码 97; `skip_check: true` 跳过并在面板标红。
 
 ### patch
 
@@ -54,7 +61,7 @@
 `GET /api/state`, `GET /api/ops`, `POST/PATCH/DELETE /api/workspaces[/{id}]`,
 `POST /api/workspaces/{id}/tokens`, `GET /api/tokens/{id}/prompt`,
 `DELETE /api/tokens/{id}`, `POST /api/tokens/{id}/merge`, `GET /api/browse?path=`,
-`POST /api/mkdir` (`{parent, name}`, 选目录时新建文件夹), `PUT /api/tokens/{id}/task` (用户给连接派活, 格式同 `/v1/task`)。
+`POST /api/mkdir` (`{parent, name}`, 选目录时新建文件夹), `PUT /api/tokens/{id}/task` (用户给连接派活, 格式同 `/v1/task`), `GET/PUT /api/workspaces/{id}/memory` (协作记忆: 关联的目录 `{dir}`, brief 行数, checks, 收件箱, 最近消息), `POST /api/workspaces/{id}/inbox/{i}/adopt|drop` (`{to?: "lessons.md" | "areas/<名字>.md"}`)。
 
 分工: `GET /api/state` 的工作区带 `repo` (origin 在 GitHub 时的页面地址), 连接带 `task` (`{issues, note, by: agent|user, at}`), worker 带 `refs` (只在这个分支上的提交说明里出现的 `#号`: 不在你当前分支, 也没推到任何远端)。`GET /api/workspaces/{id}/issues` → `{issues:{"104":{title,state}}}`, 用本机 `gh` 登录读, 缓存 5 分钟; 没装 gh 时为空, 面板改从浏览器问 GitHub。
 

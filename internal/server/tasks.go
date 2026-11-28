@@ -24,6 +24,7 @@ type Task struct {
 	Note   string    `json:"note,omitempty"`
 	By     string    `json:"by,omitempty"` // "agent" or "user"
 	At     time.Time `json:"at"`
+	Paths  []string  `json:"paths,omitempty"` // claimed directories
 }
 
 const (
@@ -82,7 +83,11 @@ func githubURL(remote string) string {
 }
 
 // cleanTask validates input; nil means "clear".
-func cleanTask(issues []int, note, by string) (*Task, error) {
+func cleanTask(issues []int, note string, paths []string, by string) (*Task, error) {
+	claims, err := cleanClaims(paths)
+	if err != nil {
+		return nil, err
+	}
 	note = strings.TrimSpace(note)
 	if len([]rune(note)) > maxTaskNote {
 		return nil, errors.New("说明最长 " + strconv.Itoa(maxTaskNote) + " 字")
@@ -101,11 +106,11 @@ func cleanTask(issues []int, note, by string) (*Task, error) {
 	if len(list) > maxTaskIssues {
 		return nil, errors.New("一次最多 " + strconv.Itoa(maxTaskIssues) + " 个 issue")
 	}
-	if len(list) == 0 && note == "" {
+	if len(list) == 0 && note == "" && len(claims) == 0 {
 		return nil, nil
 	}
 	sort.Ints(list)
-	return &Task{Issues: list, Note: note, By: by, At: time.Now()}, nil
+	return &Task{Issues: list, Note: note, By: by, At: time.Now(), Paths: claims}, nil
 }
 
 // SetTask replaces a connection's task; nil clears it.
@@ -135,6 +140,9 @@ func taskText(t *Task) string {
 	if t.Note != "" {
 		parts = append(parts, t.Note)
 	}
+	if len(t.Paths) > 0 {
+		parts = append(parts, "认领 "+strings.Join(t.Paths, ","))
+	}
 	return strings.Join(parts, " ")
 }
 
@@ -142,7 +150,7 @@ func (t *Task) wire() *proto.Task {
 	if t == nil {
 		return nil
 	}
-	return &proto.Task{Issues: t.Issues, Note: t.Note, By: t.By, At: t.At.Format(time.RFC3339)}
+	return &proto.Task{Issues: t.Issues, Note: t.Note, By: t.By, At: t.At.Format(time.RFC3339), Paths: t.Paths}
 }
 
 // IssueInfo is an issue's title and state, read with the host's own `gh`
