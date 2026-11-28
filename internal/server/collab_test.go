@@ -171,6 +171,10 @@ func TestEntriesFixDropRecallRevert(t *testing.T) {
 	if got := annotate(root, "", m.read("proj", lessonsFile)); !strings.Contains(got, "疑似过时: client/web/src/old.tsx") || strings.Count(got, "疑似过时") != 1 {
 		t.Fatalf("annotate: %s", got)
 	}
+	stale := annotate(root, "", withIDs(m.read("proj", lessonsFile)))
+	if !strings.Contains(stale, "["+entryID("总览不放插件, 见 client/web/src/old.tsx")+"]") {
+		t.Fatalf("id must come from the stored text, not the annotation: %s", stale)
+	}
 	id := entryID("截图默认暗色")
 	if !strings.Contains(withIDs(m.read("proj", lessonsFile)), "["+id+"] 截图默认暗色") {
 		t.Fatal("ids")

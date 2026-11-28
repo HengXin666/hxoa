@@ -184,7 +184,7 @@ func (s *Server) notices(c *reqCtx, op string, paths []string) []string {
 					continue
 				}
 				if note := s.Memory.read(project, filepath.Join(areasDir, k+".md")); note != "" {
-					out = append(out, "注意事项 "+k+":\n"+withIDs(annotate(c.root, c.base, note)))
+					out = append(out, "注意事项 "+k+":\n"+annotate(c.root, c.base, withIDs(note)))
 				}
 			}
 			for _, it := range s.Memory.pendingFor(project, rel) {
@@ -260,7 +260,7 @@ func (s *Server) Brief(ws *Workspace, tok *Token, root, base string) string {
 	if brief == "" {
 		b.WriteString("这个工作区还没有 brief (主人在面板 → 工作区 → 协作记忆里配)。先读仓库的 AGENTS.md 与 README。\n")
 	} else {
-		fmt.Fprintf(&b, "先读下面 brief (%d 行), 碰到新目录时会自动补充注意事项。\n\n%s\n", strings.Count(brief, "\n")+1, withIDs(annotate(root, base, brief)))
+		fmt.Fprintf(&b, "先读下面 brief (%d 行), 碰到新目录时会自动补充注意事项。\n\n%s\n", strings.Count(brief, "\n")+1, annotate(root, base, withIDs(brief)))
 	}
 	if lessons := s.Memory.readIf(project, lessonsFile); lessons != "" {
 		ls := strings.Split(lessons, "\n")
@@ -269,7 +269,7 @@ func (s *Server) Brief(ws *Workspace, tok *Token, root, base string) string {
 			more = fmt.Sprintf("\n(还有 %d 条较早的, 用 hxoa recall <关键词> 查)", len(ls)-briefLessons)
 			ls = ls[len(ls)-briefLessons:]
 		}
-		b.WriteString("\n## 主人确认过的经验\n" + withIDs(annotate(root, base, strings.Join(ls, "\n"))) + more + "\n")
+		b.WriteString("\n## 主人确认过的经验\n" + annotate(root, base, withIDs(strings.Join(ls, "\n"))) + more + "\n")
 	}
 	_, ts := s.Store.Snapshot()
 	var others []string
