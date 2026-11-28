@@ -371,7 +371,9 @@ func (s *Server) Prompt(ws *Workspace, t *Token) string {
 		"hxoa --base " + base + " --login " + t.Secret + "\n" +
 		"装完直接 hxoa ls 就能看到我的文件, 连的是本机这一个工作区"
 	if ws.Workers {
-		p += "\n\n开了并行编辑: 你在自己的 git 工作树 (分支 " + workerBranch(t) + ") 里改, 做完一段就 commit 并告诉我, 我在面板上合并。开始做某个 issue 先 hxoa task <号> 登记, 提交说明里写上 #号。"
+		m := ws.Branch()
+		p += "\n\n开了并行编辑: 你在自己的 git 工作树 (分支 " + workerBranch(t) + ") 里改, 主线是 " + m + "。开始做某个 issue 先 hxoa task <号> 登记, 提交说明里写上 #号。" +
+			"需求做完就由你直接合入主线, 不用等我也不用告诉我: 先合入最新的 " + m + " 并解决冲突, 验证原有功能和新功能都正常, 再 hxoa git push origin HEAD:" + m + " (没有远端就 hxoa merge)。只有我明确说不合入时才不合。"
 	}
 	return p
 }

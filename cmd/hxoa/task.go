@@ -65,3 +65,17 @@ func printTask(t *proto.Task) {
 	}
 	fmt.Printf("当前任务 (%s登记): %s\n", who, strings.Join(parts, " "))
 }
+
+// cmdMerge merges this worker's branch into the user's current branch, the
+// same as the panel's merge button; used when the repo has no remote.
+func cmdMerge(c *config) error {
+	var reply struct {
+		Base   string `json:"base"`
+		Output string `json:"output"`
+	}
+	if err := call(c, "POST", "/v1/merge", nil, map[string]any{}, &reply); err != nil {
+		return err
+	}
+	fmt.Printf("已合入 %s\n%s\n", reply.Base, strings.TrimSpace(reply.Output))
+	return nil
+}

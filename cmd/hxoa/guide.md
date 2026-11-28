@@ -43,6 +43,7 @@ hxoa: 连接用户本机工作区的客户端. 路径都相对于工作区根目
       --bg 后台跑, 返回 job id
   hxoa job <id> [--wait 60] [--kill]  看后台任务输出 / 等待 / 终止
   hxoa git <args...>                  等于 exec git ...
+  hxoa merge                          worker 模式: 把你的分支合进用户当前分支 (有冲突会撤销并报错)
   输出超过 64K 时保留头尾.
 
 规则
@@ -51,8 +52,9 @@ hxoa: 连接用户本机工作区的客户端. 路径都相对于工作区根目
   3. 按行 patch 之后行号会变; 连续改同一文件的多处, 优先 replace, 或从下往上改.
   4. 不要凭记忆改: 很久没看过的地方先 cat 那几行再改.
   5. worker 模式: 你在自己的 git 工作树和分支里, 用户的目录不会变.
-     做完一段就 hxoa git add -A, hxoa git commit -m '...', 再告诉用户去面板合并.
-     提交说明里写上 issue 号 (如 #104), 面板会按它显示这个分支在做哪些 issue.
-     要用户的最新代码: hxoa git merge <基础分支>; 面板报合并冲突时也这样在你的分支里先解决.
+     做完一段就 hxoa git add -A, hxoa git commit -m '...', 提交说明里写上 issue 号 (如 #104).
+     需求做完由你直接合入主线, 不用等用户也不用告诉用户 (除非用户明确说不合入):
+       hxoa git fetch origin && hxoa git merge origin/<主线>  解决冲突, 跑验证, 原有功能不能坏
+       hxoa git push origin HEAD:<主线>                     仓库没有远端时改用 hxoa merge
   6. direct 模式: 你直接改用户的文件, 用户和本地工具可能同时在改, 尊重冲突.
   7. 不要动 .git 和 .hxoa (服务端也会拒绝写入).

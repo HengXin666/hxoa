@@ -12,7 +12,7 @@ import (
 	"github.com/HengXin666/hxoa/internal/proto"
 )
 
-const ServerVersion = "hxoad/2.5.2"
+const ServerVersion = "hxoad/2.5.3"
 
 type Server struct {
 	Store  *Store
@@ -169,6 +169,21 @@ func (s *Server) AgentHandler() http.Handler {
 		s.Store.SetTask(c.tok.ID, t)
 		writeJSON(w, 200, map[string]any{"ok": true, "task": t.wire()})
 		return taskText(t), nil
+	})
+	// Agent 自己把 worker 分支合进用户当前分支: 与面板的合并相同, 有冲突或用户目录有未提交修改就撤销并报错
+	h("/v1/merge", "merge", func(w http.ResponseWriter, r *http.Request, c *reqCtx) (string, error) {
+		if r.Method != http.MethodPost {
+			return "", errf(proto.CodeBadRequest, "用 POST")
+		}
+		if !c.ws.Workers {
+			return "", errf(proto.CodeDenied, "direct 模式直接改用户的目录, 不用合并")
+		}
+		out, err := mergeWorker(c.ws, c.tok)
+		if err != nil {
+			return "", errf(proto.CodeBadRequest, err.Error())
+		}
+		writeJSON(w, 200, map[string]any{"ok": true, "base": c.ws.Branch(), "output": out})
+		return c.ws.Branch(), nil
 	})
 	h("/v1/bye", "bye", func(w http.ResponseWriter, r *http.Request, c *reqCtx) (string, error) {
 		s.Store.Bye(c.secret)

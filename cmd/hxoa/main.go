@@ -342,6 +342,8 @@ func run(args []string) error {
 		return cmdPull(c, rest)
 	case "task":
 		return cmdTask(c, rest)
+	case "merge":
+		return cmdMerge(c)
 	}
 	return usage("未知命令 " + cmd + ", 运行 hxoa guide 查看用法")
 }
