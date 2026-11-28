@@ -66,6 +66,9 @@ export interface MemoryInfo {
   checks?: string[];
   inbox?: string[];
   threads?: string[];
+  lessons?: number;
+  lessons_max?: number;
+  edits?: { sha: string; subject: string; at: string }[];
 }
 
 export interface TokenView {

@@ -174,7 +174,7 @@ func (s *Server) notices(c *reqCtx, op string, paths []string) []string {
 	// Agents that skip `hxoa task` still get the brief once, on their first
 	// write or command, instead of being blocked.
 	if project != "" && (writeOps[op] || op == "exec") && !s.collab.briefed(c.tok.ID) {
-		out = append(out, "你还没看过本项目的 brief (开工应先 hxoa task <号> --paths <目录>), 先读完再继续:\n"+s.Brief(c.ws, c.tok))
+		out = append(out, "你还没看过本项目的 brief (开工应先 hxoa task <号> --paths <目录>), 先读完再继续:\n"+s.Brief(c.ws, c.tok, c.root))
 	}
 	for _, p := range paths {
 		rel := strings.Trim(filepath.ToSlash(filepath.Clean("/"+p)), "/")
@@ -184,7 +184,12 @@ func (s *Server) notices(c *reqCtx, op string, paths []string) []string {
 					continue
 				}
 				if note := s.Memory.read(project, filepath.Join(areasDir, k+".md")); note != "" {
-					out = append(out, "注意事项 "+k+":\n"+note)
+					out = append(out, "注意事项 "+k+":\n"+withIDs(annotate(c.root, note)))
+				}
+			}
+			for _, it := range s.Memory.pendingFor(project, rel) {
+				if s.collab.firstTouch(c.tok.ID, "pending:"+entryID(it)) {
+					out = append(out, it+" (还没经主人确认, 当参考)")
 				}
 			}
 		}
@@ -240,7 +245,7 @@ func claimText(t *Task) string {
 }
 
 // Brief is the start-of-work pack for a connection.
-func (s *Server) Brief(ws *Workspace, tok *Token) string {
+func (s *Server) Brief(ws *Workspace, tok *Token, root string) string {
 	project := s.Memory.Route(ws.ID)
 	var b strings.Builder
 	head := ws.Name
@@ -255,10 +260,16 @@ func (s *Server) Brief(ws *Workspace, tok *Token) string {
 	if brief == "" {
 		b.WriteString("这个工作区还没有 brief (主人在面板 → 工作区 → 协作记忆里配)。先读仓库的 AGENTS.md 与 README。\n")
 	} else {
-		fmt.Fprintf(&b, "先读下面 brief (%d 行), 碰到新目录时会自动补充注意事项。\n\n%s\n", strings.Count(brief, "\n")+1, brief)
+		fmt.Fprintf(&b, "先读下面 brief (%d 行), 碰到新目录时会自动补充注意事项。\n\n%s\n", strings.Count(brief, "\n")+1, withIDs(annotate(root, brief)))
 	}
 	if lessons := s.Memory.readIf(project, lessonsFile); lessons != "" {
-		b.WriteString("\n## 主人确认过的经验\n" + lessons + "\n")
+		ls := strings.Split(lessons, "\n")
+		more := ""
+		if len(ls) > briefLessons {
+			more = fmt.Sprintf("\n(还有 %d 条较早的, 用 hxoa recall <关键词> 查)", len(ls)-briefLessons)
+			ls = ls[len(ls)-briefLessons:]
+		}
+		b.WriteString("\n## 主人确认过的经验\n" + withIDs(annotate(root, strings.Join(ls, "\n"))) + more + "\n")
 	}
 	_, ts := s.Store.Snapshot()
 	var others []string
@@ -276,6 +287,8 @@ func (s *Server) Brief(ws *Workspace, tok *Token) string {
 	b.WriteString("- 开工: hxoa task <号> --paths <要改的目录> (认领后别人改到会提醒他告诉你)\n")
 	b.WriteString("- 改到别人认领的目录或共用文件 (协议, 常量): hxoa say '做了什么, 影响谁'\n")
 	b.WriteString("- 踩坑或被主人打回: hxoa learn '一句话规则'\n")
+	b.WriteString("- 记忆和代码或仓库文档冲突时以后者为准, 顺手改掉: hxoa learn --fix <编号> '新说法' 或 --drop <编号> '原因', 直接生效\n")
+	b.WriteString("- 按需查更多: hxoa recall <关键词>\n")
 	if project != "" && len(parseChecks(s.Memory.read(project, checksFile))) > 0 {
 		b.WriteString("- commit 会自动跑 checks.yml, 不过就拒\n")
 	}
@@ -335,8 +348,36 @@ func (s *Server) Learn(c *reqCtx, text string) error {
 	if project == "" {
 		return errf(proto.CodeDenied, "这个工作区还没接协作记忆, 请主人在面板里配")
 	}
-	line := fmt.Sprintf("- %s %s%s: %s", time.Now().Format("2006-01-02"), c.tok.Label, issuesText(c.tok.Task), text)
+	claims := ""
+	if c.tok.Task != nil && len(c.tok.Task.Paths) > 0 {
+		claims = " [" + strings.Join(c.tok.Task.Paths, ", ") + "]"
+	}
+	line := fmt.Sprintf("- %s %s%s%s: %s", time.Now().Format("2006-01-02"), c.tok.Label, issuesText(c.tok.Task), claims, text)
 	return s.Memory.appendLine(project, inboxFile, line, "hxoa learn: "+c.tok.Label)
 }
 
 func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }
+
+// EditEntry is an agent fixing (text != "") or dropping a memory entry it
+// found wrong in practice; takes effect at once, the user reviews later.
+func (s *Server) EditEntry(c *reqCtx, id, text, why string) (string, error) {
+	project := s.Memory.Route(c.ws.ID)
+	if project == "" {
+		return "", errf(proto.CodeDenied, "这个工作区还没接协作记忆")
+	}
+	text, why = oneLine(text), oneLine(why)
+	if text == "" && why == "" {
+		return "", errf(proto.CodeBadRequest, "删掉要写原因: hxoa learn --drop <编号> '原因'")
+	}
+	if len([]rune(text)) > maxLearn {
+		return "", errf(proto.CodeBadRequest, fmt.Sprintf("一句话就好, 最多 %d 字", maxLearn))
+	}
+	if text != "" {
+		text = fmt.Sprintf("%s (%s %s 改)", text, time.Now().Format("2006-01-02"), c.tok.Label)
+	}
+	f, err := s.Memory.Edit(project, id, text, c.tok.Label, why)
+	if err != nil {
+		return "", errf(proto.CodeNotFound, err.Error())
+	}
+	return f, nil
+}

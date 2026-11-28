@@ -129,7 +129,7 @@ func TestMemoryInboxAndNotices(t *testing.T) {
 	if len(m.Threads("proj", 10)) != 1 {
 		t.Fatalf("threads: %v", m.Threads("proj", 10))
 	}
-	if br := s.Brief(ws, b); !strings.Contains(br, "oa_1 #155 认领 client/web") || !strings.Contains(br, "主人确认过的经验") {
+	if br := s.Brief(ws, b, ""); !strings.Contains(br, "oa_1 #155 认领 client/web") || !strings.Contains(br, "主人确认过的经验") {
 		t.Fatalf("brief: %s", br)
 	}
 }
@@ -158,5 +158,47 @@ func TestPushGateAndLateBrief(t *testing.T) {
 	}
 	if got := s.notices(c, "write", []string{"y"}); len(got) != 0 {
 		t.Fatalf("brief twice: %q", got)
+	}
+}
+
+func TestEntriesFixDropRecallRevert(t *testing.T) {
+	m, _ := OpenMemory(filepath.Join(t.TempDir(), "mem"), "")
+	m.SetRoute("ws1", "proj")
+	root := t.TempDir()
+	os.MkdirAll(filepath.Join(root, "client", "web"), 0o700)
+	m.appendLine("proj", lessonsFile, "- 总览不放插件, 见 client/web/src/old.tsx", "t")
+	m.appendLine("proj", lessonsFile, "- 截图默认暗色", "t")
+	if got := annotate(root, m.read("proj", lessonsFile)); !strings.Contains(got, "疑似过时: client/web/src/old.tsx") || strings.Count(got, "疑似过时") != 1 {
+		t.Fatalf("annotate: %s", got)
+	}
+	id := entryID("截图默认暗色")
+	if !strings.Contains(withIDs(m.read("proj", lessonsFile)), "["+id+"] 截图默认暗色") {
+		t.Fatal("ids")
+	}
+	if _, err := m.Edit("proj", id, "截图默认暗色 (ink)", "oa_3", "主题名改了"); err != nil {
+		t.Fatal(err)
+	}
+	if hits := m.Recall("proj", []string{"ink"}); len(hits) != 1 || !strings.Contains(hits[0], "lessons.md") {
+		t.Fatalf("recall: %v", hits)
+	}
+	edits := m.AgentEdits("proj")
+	if len(edits) != 1 || !strings.HasPrefix(edits[0].Subject, "fix ") {
+		t.Fatalf("edits: %+v", edits)
+	}
+	if err := m.Revert(edits[0].SHA); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(m.read("proj", lessonsFile), "截图默认暗色\n") && !strings.HasSuffix(m.read("proj", lessonsFile), "截图默认暗色") {
+		t.Fatalf("revert: %q", m.read("proj", lessonsFile))
+	}
+	if _, err := m.Edit("proj", entryID("总览不放插件, 见 client/web/src/old.tsx"), "", "oa_3", "文件已删"); err != nil || strings.Contains(m.read("proj", lessonsFile), "old.tsx") {
+		t.Fatalf("drop: %v", err)
+	}
+	m.appendLine("proj", inboxFile, "- 2026-11-28 oa_2 (#155) [client/web]: 空状态要有占位", "t")
+	if p := m.pendingFor("proj", "client/web/ui/a.tsx"); len(p) != 1 || !strings.HasPrefix(p[0], "[未审]") {
+		t.Fatalf("pending: %v", p)
+	}
+	if err := m.Resolve("proj", 0, true, ""); err != nil || !strings.Contains(m.read("proj", "areas/client-web.md"), "空状态要有占位") {
+		t.Fatalf("auto route: %v %q", err, m.read("proj", "areas/client-web.md"))
 	}
 }

@@ -12,7 +12,7 @@ import (
 	"github.com/HengXin666/hxoa/internal/proto"
 )
 
-const ServerVersion = "hxoad/2.6.1"
+const ServerVersion = "hxoad/2.6.2"
 
 type Server struct {
 	Store  *Store
@@ -173,7 +173,7 @@ func (s *Server) AgentHandler() http.Handler {
 		c.tok.Task = t
 		reply := map[string]any{"ok": true, "task": t.wire()}
 		if t != nil {
-			reply["brief"] = s.Brief(c.ws, c.tok)
+			reply["brief"] = s.Brief(c.ws, c.tok, c.root)
 			s.collab.briefed(c.tok.ID)
 		}
 		writeJSON(w, 200, reply)
@@ -196,7 +196,7 @@ func (s *Server) AgentHandler() http.Handler {
 	})
 	h("/v1/brief", "brief", func(w http.ResponseWriter, r *http.Request, c *reqCtx) (string, error) {
 		s.collab.briefed(c.tok.ID)
-		writeJSON(w, 200, proto.BriefReply{OK: true, Text: s.Brief(c.ws, c.tok)})
+		writeJSON(w, 200, proto.BriefReply{OK: true, Text: s.Brief(c.ws, c.tok, c.root)})
 		return "", nil
 	})
 	h("/v1/say", "say", func(w http.ResponseWriter, r *http.Request, c *reqCtx) (string, error) {
@@ -216,11 +216,32 @@ func (s *Server) AgentHandler() http.Handler {
 		if err := decode(r, &req); err != nil {
 			return "", err
 		}
+		if id := req.Fix + req.Drop; id != "" {
+			text, why := req.Text, req.Why
+			if req.Drop != "" {
+				text, why = "", req.Text
+			}
+			f, err := s.EditEntry(c, id, text, why)
+			if err != nil {
+				return id, err
+			}
+			writeJSON(w, 200, map[string]any{"ok": true, "file": f})
+			return id + " " + f, nil
+		}
 		if err := s.Learn(c, req.Text); err != nil {
 			return req.Text, err
 		}
 		writeJSON(w, 200, map[string]any{"ok": true})
 		return req.Text, nil
+	})
+	h("/v1/recall", "recall", func(w http.ResponseWriter, r *http.Request, c *reqCtx) (string, error) {
+		q := strings.TrimSpace(r.URL.Query().Get("q"))
+		project := s.Memory.Route(c.ws.ID)
+		if project == "" || q == "" {
+			return q, errf(proto.CodeBadRequest, "用法: hxoa recall <关键词...> (工作区要先接协作记忆)")
+		}
+		writeJSON(w, 200, map[string]any{"ok": true, "hits": s.Memory.Recall(project, strings.Fields(q))})
+		return q, nil
 	})
 	h("/v1/bye", "bye", func(w http.ResponseWriter, r *http.Request, c *reqCtx) (string, error) {
 		s.Store.Bye(c.secret)

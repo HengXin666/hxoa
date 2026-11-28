@@ -358,6 +358,8 @@ func run(args []string) error {
 		return cmdSay(c, rest)
 	case "learn":
 		return cmdLearn(c, rest)
+	case "recall":
+		return cmdRecall(c, rest)
 	case "merge":
 		return cmdMerge(c)
 	}

@@ -102,6 +102,10 @@ func (m *Memory) commit(msg string) {
 	if _, err := git(m.Dir, "-c", "user.name=hxoad", "-c", "user.email=hxoad@localhost", "commit", "-q", "-m", msg); err != nil {
 		return
 	}
+	m.pushAsync()
+}
+
+func (m *Memory) pushAsync() {
 	if m.hasOrigin() {
 		go func() {
 			m.mu.Lock()
@@ -219,7 +223,8 @@ func (m *Memory) Inbox(project string) []string {
 // Resolve takes inbox item i out; adopt appends it to lessons.md or to an
 // area file ("areas/client-web.md"), drop just removes it.
 func (m *Memory) Resolve(project string, i int, adopt bool, to string) error {
-	if to == "" {
+	auto := to == ""
+	if auto {
 		to = lessonsFile
 	}
 	if to != lessonsFile && !(strings.HasPrefix(to, areasDir+"/") && strings.HasSuffix(to, ".md") && projectNameRe.MatchString(strings.TrimSuffix(strings.TrimPrefix(to, areasDir+"/"), ".md"))) {
@@ -248,6 +253,13 @@ func (m *Memory) Resolve(project string, i int, adopt bool, to string) error {
 		return err
 	}
 	verb := "丢弃"
+	if adopt && auto {
+		// 只和某个目录有关的经验进那个目录的注意事项, brief 只留全局的
+		if cs := claimsOf(item); len(cs) > 0 {
+			ks := areaKeys(cs[0])
+			to = areasDir + "/" + ks[len(ks)-1] + ".md"
+		}
+	}
 	if adopt {
 		dst := filepath.Join(m.Dir, project, to)
 		os.MkdirAll(filepath.Dir(dst), 0o700)

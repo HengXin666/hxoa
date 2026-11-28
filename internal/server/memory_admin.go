@@ -52,6 +52,19 @@ func (s *Server) memoryRoutes(mux *http.ServeMux) {
 			out["checks"] = checks
 			out["inbox"] = inbox
 			out["threads"] = threads
+			lessons := 0
+			for _, l := range strings.Split(s.Memory.read(p, lessonsFile), "\n") {
+				if strings.HasPrefix(l, "- ") {
+					lessons++
+				}
+			}
+			out["lessons"] = lessons
+			out["lessons_max"] = briefLessons
+			edits := s.Memory.AgentEdits(p)
+			if edits == nil {
+				edits = []AgentEdit{}
+			}
+			out["edits"] = edits
 		}
 		writeJSON(w, 200, out)
 	})
@@ -69,6 +82,18 @@ func (s *Server) memoryRoutes(mux *http.ServeMux) {
 			return
 		}
 		s.ops.add(opEntry{At: time.Now(), Who: actor(r), WS: v.Name, Op: "memory", Target: in.Dir, OK: true})
+		writeJSON(w, 200, map[string]any{"ok": true})
+	})
+	mux.HandleFunc("POST /api/workspaces/{id}/memory/revert/{sha}", func(w http.ResponseWriter, r *http.Request) {
+		v := ws(w, r)
+		if v == nil {
+			return
+		}
+		if err := s.Memory.Revert(r.PathValue("sha")); err != nil {
+			writeJSON(w, 400, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		s.ops.add(opEntry{At: time.Now(), Who: actor(r), WS: v.Name, Op: "memory revert", Target: r.PathValue("sha"), OK: true})
 		writeJSON(w, 200, map[string]any{"ok": true})
 	})
 	mux.HandleFunc("POST /api/workspaces/{id}/inbox/{i}/{act}", func(w http.ResponseWriter, r *http.Request) {

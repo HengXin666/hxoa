@@ -35,7 +35,8 @@
 | GET/POST `/v1/task` | 看 / 登记这个连接在做的事 `{issues:[104], note, paths:["client/web"]}` (paths 为认领的目录); 全空即清空 → `{task, brief}` (登记时带 brief 全文)。hello 也带 `task` |
 | GET `/v1/brief` | 开工包: 项目 brief, 采纳过的经验, 其他 worker 认领了什么, 3 个动作 → `{text}` |
 | POST `/v1/say` | `{text, to?}` 给同工作区的其他连接 (或叫 to 的那个) 带一句话, 记进记忆的 `threads/` → `{to:[...]}` |
-| POST `/v1/learn` | `{text}` 一句经验进记忆的 `inbox.md`, 主人在面板采纳或丢弃 |
+| POST `/v1/learn` | `{text}` 一句经验进记忆的 `inbox.md` (带认领目录), 主人在面板采纳或丢弃; `{fix:<编号>, text, why?}` 改一条记忆, `{drop:<编号>, text:原因}` 删一条, 立即生效, 面板可撤回 |
+| GET `/v1/recall?q=` | 按关键词 (全部命中) 搜记忆条目与协作消息, 最多 30 条 → `{hits}` |
 | POST `/v1/merge` | worker 模式: 把自己的分支合进用户当前分支 (同面板合并) |
 
 任何响应都可能带 `X-Hxoa-Notice`: base64 的 JSON 字符串数组 (别人的 say, 第一次碰某目录的注意事项, 写到别人认领目录的提醒), 客户端逐行以 `# ` 打到 stderr。

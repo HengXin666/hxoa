@@ -221,6 +221,12 @@ type SayReq struct {
 // user adopts or drops it from the panel.
 type LearnReq struct {
 	Text string `json:"text"`
+	// Fix or Drop names a memory entry (its id, shown as [m3f9a2c]) the
+	// agent found wrong: Fix replaces it with Text, Drop removes it with
+	// Text as the reason. Both take effect at once; the user can revert.
+	Fix  string `json:"fix,omitempty"`
+	Drop string `json:"drop,omitempty"`
+	Why  string `json:"why,omitempty"`
 }
 
 // BriefReply is the start-of-work pack: project brief, adopted lessons,

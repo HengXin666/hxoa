@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -89,15 +90,51 @@ func cmdSay(c *config, args []string) error {
 }
 
 // cmdLearn: hxoa learn '一句能判断对错的规则'
+//
+//	hxoa learn --fix m3f9a2c '新说法' [--why 原因]   改一条错了的记忆
+//	hxoa learn --drop m3f9a2c '原因'                 删一条过时的记忆
 func cmdLearn(c *config, args []string) error {
-	text := strings.Join(args, " ")
+	f := parse(args, "fix", "drop", "why")
+	text := strings.Join(f.pos, " ")
+	req := proto.LearnReq{Text: text, Fix: f.str("fix"), Drop: f.str("drop"), Why: f.str("why")}
 	if strings.TrimSpace(text) == "" {
-		return usage("learn '一句能判断对错的规则'")
+		return usage("learn '一句能判断对错的规则' | learn --fix <编号> '新说法' | learn --drop <编号> '原因'")
 	}
-	if err := call(c, "POST", "/v1/learn", nil, proto.LearnReq{Text: text}, nil); err != nil {
+	var r struct {
+		File string `json:"file"`
+	}
+	if err := call(c, "POST", "/v1/learn", nil, req, &r); err != nil {
 		return err
 	}
-	fmt.Println("已放进经验收件箱, 主人在面板采纳后进 brief")
+	switch {
+	case req.Fix != "":
+		fmt.Printf("已改 %s 里的 %s, 立即生效 (主人可在面板撤回)\n", r.File, req.Fix)
+	case req.Drop != "":
+		fmt.Printf("已删 %s 里的 %s, 立即生效 (主人可在面板撤回)\n", r.File, req.Drop)
+	default:
+		fmt.Println("已放进经验收件箱; 主人采纳前, 碰到你认领的目录的人也会看到 (标为未审)")
+	}
+	return nil
+}
+
+// cmdRecall: hxoa recall <关键词...> 搜记忆与协作消息, 每个关键词都要命中
+func cmdRecall(c *config, args []string) error {
+	if len(args) == 0 {
+		return usage("recall <关键词...>")
+	}
+	var r struct {
+		Hits []string `json:"hits"`
+	}
+	if err := call(c, "GET", "/v1/recall", url.Values{"q": {strings.Join(args, " ")}}, nil, &r); err != nil {
+		return err
+	}
+	if len(r.Hits) == 0 {
+		fmt.Println("没找到, 换个关键词; 记忆没有的以代码和仓库文档为准")
+		return nil
+	}
+	for _, h := range r.Hits {
+		fmt.Println(h)
+	}
 	return nil
 }
 
