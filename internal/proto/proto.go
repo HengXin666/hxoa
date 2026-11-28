@@ -197,6 +197,9 @@ type ExecReply struct {
 	Truncated bool   `json:"truncated,omitempty"`
 	TimedOut  bool   `json:"timed_out,omitempty"`
 	Millis    int64  `json:"ms"`
+	// Gated: the command is a git commit / push that runs the project's
+	// checks.yml first (the workspace is routed to a project that has one).
+	Gated bool `json:"gated,omitempty"`
 }
 
 // Target lets the client forget a cached version when a write conflicts.

@@ -846,19 +846,41 @@ func cmdExec(c *config, args []string) error {
 		return err
 	}
 	if wait {
-		meta("commit / push 前先跑 checks.yml (job %s), 等结果", r.Job)
-		for r.Running {
-			if err := call(c, "GET", "/v1/job", url.Values{"id": {r.Job}, "wait": {"60"}}, nil, &r); err != nil {
-				return err
-			}
+		if r.Gated {
+			meta("commit / push 前先跑 checks.yml (job %s), 等结果", r.Job)
 		}
-		return printExec(&r)
+		return waitJob(c, &r)
 	}
 	if req.Bg {
 		fmt.Println("job " + r.Job)
 		return nil
 	}
 	return printExec(&r)
+}
+
+// waitJob polls a running job in short waits (each well under a proxy's ~100 s
+// limit). A failed poll (a 502/524 from the tunnel, a dropped connection) is
+// not the job failing: retry with backoff; when the server stays unreachable,
+// say how to keep waiting instead of losing the job.
+func waitJob(c *config, r *proto.ExecReply) error {
+	id, fails := r.Job, 0
+	for r.Running {
+		var next proto.ExecReply
+		err := call(c, "GET", "/v1/job", url.Values{"id": {id}, "wait": {"45"}}, nil, &next)
+		if err == nil {
+			*r, fails = next, 0
+			continue
+		}
+		var ee *exitErr
+		if errors.As(err, &ee) || fails >= 8 {
+			meta("job %s 可能还在跑: hxoa job %s --wait 60 继续等", id, id)
+			return err
+		}
+		fails++
+		meta("查询 job %s 失败 (%v), %d 秒后重试", id, err, 2*fails)
+		time.Sleep(time.Duration(2*fails) * time.Second)
+	}
+	return printExec(r)
 }
 
 // commitRe matches the server's: a git commit anywhere in the command line.

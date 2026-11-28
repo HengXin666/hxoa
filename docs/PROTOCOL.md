@@ -29,7 +29,7 @@
 | POST `/v1/mv` | `{from, to, if_match}` |
 | POST `/v1/mkdir` | `{path}` 建目录 (含缺的上级) → `{created}`; 已有同名目录 created 为 false, 同名文件为 exists |
 | POST `/v1/grep` | `{pattern, path, glob, fixed, icase, max}` → `{text}` |
-| POST `/v1/exec` | `{cmd, dir, timeout, bg, stdin}` → `{code, stdout, stderr, ms, timed_out}` 或 `{job}` |
+| POST `/v1/exec` | `{cmd, dir, timeout, bg, stdin}` → `{code, stdout, stderr, ms, timed_out}` 或 `{job}`; `gated: true` = 这条 git commit/push 会先跑项目的 checks.yml (客户端只在这时提示) |
 | GET `/v1/job?id=&wait=&kill=1` | 后台任务状态和输出 |
 | GET `/v1/tar?path=&all=1` | 目录的 tar.gz |
 | GET/POST `/v1/task` | 看 / 登记这个连接在做的事 `{issues:[104], note, paths:["client/web"]}` (paths 为认领的目录); 全空即清空 → `{task, brief}` (登记时带 brief 全文)。hello 也带 `task` |

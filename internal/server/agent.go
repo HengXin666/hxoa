@@ -353,6 +353,7 @@ func (s *Server) AgentHandler() http.Handler {
 		if err != nil {
 			return req.Cmd, err
 		}
+		out.Gated = done != nil
 		writeJSON(w, 200, out)
 		return req.Cmd, nil
 	})
