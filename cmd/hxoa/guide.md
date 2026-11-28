@@ -17,7 +17,7 @@ hxoa: 连接用户本机工作区的客户端. 路径都相对于工作区根目
   hxoa learn --fix <编号> '新说法'    记忆和代码或文档对不上 (以代码为准) 时直接改, --drop <编号> '原因' 删
   hxoa recall <关键词...>            按需搜全部记忆与协作消息; 记忆条目都带 [m1a2b3c] 编号
   自动的: 别人的 say, 第一次碰某个目录的注意事项, 改到别人认领目录的提醒, 都在你下一次跑 hxoa 时
-  以 "# ..." 打到 stderr, 看到就照做; git commit 与 git push 前自动跑项目的 checks.yml, 不过就拒
+  以 "# ..." 打到 stderr, 看到就参考 (和主人的要求或代码冲突时以主人和代码为准); git commit 与 git push 前自动跑项目的 checks.yml, 不过就拒
   (确实要跳过: hxoa git --skip-check commit ..., 面板会标红). 没登记任务就开写, 第一次写入时会补发 brief.
   hxoa brief                        再看一遍 brief     hxoa task          看当前登记
   hxoa task --clear                 做完, 或不再做了
@@ -62,7 +62,7 @@ hxoa: 连接用户本机工作区的客户端. 路径都相对于工作区根目
   4. 不要凭记忆改: 很久没看过的地方先 cat 那几行再改.
   5. worker 模式: 你在自己的 git 工作树和分支里, 用户的目录不会变.
      做完一段就 hxoa git add -A, hxoa git commit -m '...', 提交说明里写上 issue 号 (如 #104).
-     需求做完由你直接合入主线, 不用等用户也不用告诉用户 (除非用户明确说不合入):
+     需求做完由你直接合入主线, 不用等用户确认, 推完在回复里说一句推了哪些提交 (除非用户明确说不合入):
        hxoa git fetch origin && hxoa git merge origin/<主线>  解决冲突, 跑验证, 原有功能不能坏
        hxoa git push origin HEAD:<主线>                     仓库没有远端时改用 hxoa merge
   6. direct 模式: 你直接改用户的文件, 用户和本地工具可能同时在改, 尊重冲突.

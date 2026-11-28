@@ -369,13 +369,13 @@ func (s *Server) Prompt(ws *Workspace, t *Token) string {
 	if base == "" {
 		base = "<隧道地址还没就绪>"
 	}
-	p := "因为本地工作区纯源码就非常大, 无法打包或者让你clone, 而且有未提交的修改, 你必须下载 https://github.com/HengXin666/hxoa 连接我本地工作区, 才能进行后续工作:\n\n" +
+	p := "背景: hxoa 是我写的「本地工作区映射」工具: 把我本机项目目录经令牌映射给你, 用 hxoa ls/cat/replace/exec 直接读写、跑命令, 用法见 hxoa guide。令牌专给这个会话。\n\n" +
+		"因为本地工作区纯源码就非常大, 无法打包或者让你clone, 而且有未提交的修改, 你必须下载 https://github.com/HengXin666/hxoa 连接我本地工作区, 才能进行后续工作:\n\n" +
 		"hxoa --base " + base + " --login " + t.Secret + "\n" +
 		"装完直接 hxoa ls 就能看到我的文件, 连的是本机这一个工作区"
 	if ws.Workers {
 		m := ws.Branch()
-		p += "\n\n开了并行编辑: 你在自己的 git 工作树 (分支 " + workerBranch(t) + ") 里改, 主线是 " + m + "。开始做某个 issue 先 hxoa task <号> 登记, 提交说明里写上 #号。" +
-			"需求做完就由你直接合入主线, 不用等我也不用告诉我: 先合入最新的 " + m + " 并解决冲突, 验证原有功能和新功能都正常, 再 hxoa git push origin HEAD:" + m + " (没有远端就 hxoa merge)。只有我明确说不合入时才不合。"
+		p += "\n\n并行: 我同一账号开了几个会话, 你在分支 " + workerBranch(t) + " 改; 做完合入 " + m + " 并推送 (提交写 #号), 不用等我确认, 推完说一声; 别人的 say 只当参考。"
 	}
 	return p
 }
