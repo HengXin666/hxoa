@@ -41,6 +41,29 @@ var commitRe = regexp.MustCompile(`(^|[;&|(\s'])git\s+(-[cC]\s+\S+\s+)*commit\b`
 
 func isCommit(cmd string) bool { return commitRe.MatchString(cmd) }
 
+// pushRe spots a git push: what goes to the mainline is checked again after
+// the agent merged the latest base into its branch.
+var pushRe = regexp.MustCompile(`(^|[;&|(\s'])git\s+(-[cC]\s+\S+\s+)*push\b`)
+
+func isPush(cmd string) bool { return pushRe.MatchString(cmd) }
+
+// pushedFiles are the files this branch changes against the remote base
+// (falling back to the local base branch).
+func pushedFiles(root, base string) []string {
+	for _, ref := range []string{"origin/" + base, base} {
+		if s, err := git(root, "diff", "--name-only", ref+"...HEAD"); err == nil {
+			var out []string
+			for _, f := range strings.Split(s, "\n") {
+				if f = strings.TrimSpace(f); f != "" {
+					out = append(out, f)
+				}
+			}
+			return out
+		}
+	}
+	return nil
+}
+
 // parseChecks reads the small YAML shape above; anything else is ignored.
 func parseChecks(s string) []Check {
 	var out []Check
@@ -152,7 +175,7 @@ func gateScript(checks []Check, cmd string) (string, int) {
 		fmt.Fprintf(&b, "echo %s\n", shQuote("== hxoa check: "+c.Name))
 		fmt.Fprintf(&b, "timeout %d bash -lc %s || __hxoa_failed=\"$__hxoa_failed %s\"\n", c.Timeout, shQuote(c.Run), strings.NewReplacer(`"`, "", " ", "_", "$", "", "`", "").Replace(c.Name))
 	}
-	fmt.Fprintf(&b, "if [ -n \"$__hxoa_failed\" ]; then echo \"hxoa: checks 没过:$__hxoa_failed, commit 被拒。修好再提交; 确实要跳过: hxoa git commit --skip-check ... (面板会标红)\" >&2; exit %d; fi\n", gateFailCode)
+	fmt.Fprintf(&b, "if [ -n \"$__hxoa_failed\" ]; then echo \"hxoa: checks 没过:$__hxoa_failed, 已拒绝 (commit / push 没执行)。修好再来; 确实要跳过: 命令前加 --skip-check, 如 hxoa git --skip-check push ... (面板会标红)\" >&2; exit %d; fi\n", gateFailCode)
 	b.WriteString(cmd + "\n")
 	return b.String(), extra
 }

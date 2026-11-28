@@ -12,7 +12,7 @@ import (
 	"github.com/HengXin666/hxoa/internal/proto"
 )
 
-const ServerVersion = "hxoad/2.6.0"
+const ServerVersion = "hxoad/2.6.1"
 
 type Server struct {
 	Store  *Store
@@ -174,6 +174,7 @@ func (s *Server) AgentHandler() http.Handler {
 		reply := map[string]any{"ok": true, "task": t.wire()}
 		if t != nil {
 			reply["brief"] = s.Brief(c.ws, c.tok)
+			s.collab.briefed(c.tok.ID)
 		}
 		writeJSON(w, 200, reply)
 		return taskText(t), nil
@@ -194,6 +195,7 @@ func (s *Server) AgentHandler() http.Handler {
 		return c.ws.Branch(), nil
 	})
 	h("/v1/brief", "brief", func(w http.ResponseWriter, r *http.Request, c *reqCtx) (string, error) {
+		s.collab.briefed(c.tok.ID)
 		writeJSON(w, 200, proto.BriefReply{OK: true, Text: s.Brief(c.ws, c.tok)})
 		return "", nil
 	})
@@ -364,7 +366,8 @@ func (s *Server) AgentHandler() http.Handler {
 // the changed files run first and the commit only happens when all pass.
 // The returned hook records the outcome on the connection for the panel.
 func (s *Server) gate(c *reqCtx, req *proto.ExecReq) func(*job) {
-	if !isCommit(req.Cmd) {
+	commit, push := isCommit(req.Cmd), isPush(req.Cmd)
+	if !commit && !push {
 		return nil
 	}
 	project := s.Memory.Route(c.ws.ID)
@@ -380,7 +383,14 @@ func (s *Server) gate(c *reqCtx, req *proto.ExecReq) func(*job) {
 		s.Store.SetCheck(id, &CheckState{At: time.Now(), Skipped: true})
 		return nil
 	}
-	run := applicable(checks, changedFiles(c.root))
+	var files []string
+	if commit {
+		files = changedFiles(c.root)
+	}
+	if push {
+		files = append(files, pushedFiles(c.root, c.base)...)
+	}
+	run := applicable(checks, files)
 	if len(run) == 0 {
 		return nil
 	}

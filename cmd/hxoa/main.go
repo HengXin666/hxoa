@@ -835,7 +835,7 @@ func cmdExec(c *config, args []string) error {
 	}
 	// A commit may first run the workspace's checks; run it as a job and
 	// wait in short polls so no single request outlives a proxy's timeout.
-	wait := !req.Bg && commitRe.MatchString(req.Cmd)
+	wait := !req.Bg && (commitRe.MatchString(req.Cmd) || pushRe.MatchString(req.Cmd))
 	if wait {
 		req.Bg = true
 	}
@@ -844,7 +844,7 @@ func cmdExec(c *config, args []string) error {
 		return err
 	}
 	if wait {
-		meta("commit 前先跑 checks.yml (job %s), 等结果", r.Job)
+		meta("commit / push 前先跑 checks.yml (job %s), 等结果", r.Job)
 		for r.Running {
 			if err := call(c, "GET", "/v1/job", url.Values{"id": {r.Job}, "wait": {"60"}}, nil, &r); err != nil {
 				return err
@@ -860,6 +860,8 @@ func cmdExec(c *config, args []string) error {
 }
 
 // commitRe matches the server's: a git commit anywhere in the command line.
+var pushRe = regexp.MustCompile(`(^|[;&|(\s'])git\s+(-[cC]\s+\S+\s+)*push\b`)
+
 var commitRe = regexp.MustCompile(`(^|[;&|(\s'])git\s+(-[cC]\s+\S+\s+)*commit\b`)
 
 func cmdJob(c *config, args []string) error {

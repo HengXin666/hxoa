@@ -112,6 +112,7 @@ func TestMemoryInboxAndNotices(t *testing.T) {
 	st.tokens["sa"], st.tokens["sb"] = a, b
 	s := &Server{Store: st, Memory: m}
 	cb := &reqCtx{tok: b, ws: ws}
+	s.collab.briefed(b.ID)
 	got := s.notices(cb, "write", []string{"client/web/ui/x.tsx"})
 	if len(got) != 2 || !strings.Contains(got[0], "只用 HX-UI") || !strings.Contains(got[1], "oa_1 认领了 client/web (#155)") {
 		t.Fatalf("notices: %q", got)
@@ -130,5 +131,32 @@ func TestMemoryInboxAndNotices(t *testing.T) {
 	}
 	if br := s.Brief(ws, b); !strings.Contains(br, "oa_1 #155 认领 client/web") || !strings.Contains(br, "主人确认过的经验") {
 		t.Fatalf("brief: %s", br)
+	}
+}
+
+func TestPushGateAndLateBrief(t *testing.T) {
+	for cmd, want := range map[string]bool{"git push origin HEAD:main": true, "git -c a=b push": true, "git pushx": false, "echo git": false} {
+		if isPush(cmd) != want {
+			t.Fatalf("isPush(%q)", cmd)
+		}
+	}
+	m, _ := OpenMemory(filepath.Join(t.TempDir(), "mem"), "")
+	m.SetRoute("ws1", "proj")
+	os.WriteFile(filepath.Join(m.Dir, "proj", briefFile), []byte("只读这一行"), 0o600)
+	st, _ := OpenStore(t.TempDir())
+	ws := &Workspace{ID: "ws1", Name: "w"}
+	tok := &Token{ID: "a", Label: "oa_1", Workspace: "ws1"}
+	st.ws["ws1"] = ws
+	st.tokens["sa"] = tok
+	s := &Server{Store: st, Memory: m}
+	c := &reqCtx{tok: tok, ws: ws}
+	if got := s.notices(c, "read", []string{"x"}); len(got) != 0 {
+		t.Fatalf("read should not brief: %q", got)
+	}
+	if got := s.notices(c, "write", []string{"x"}); len(got) != 1 || !strings.Contains(got[0], "只读这一行") {
+		t.Fatalf("late brief: %q", got)
+	}
+	if got := s.notices(c, "write", []string{"y"}); len(got) != 0 {
+		t.Fatalf("brief twice: %q", got)
 	}
 }

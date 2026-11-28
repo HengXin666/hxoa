@@ -33,6 +33,20 @@ type collab struct {
 	queue  map[string][]string        // token id -> pending notices
 	areas  map[string]map[string]bool // token id -> area keys already shown
 	warned map[string]time.Time       // token|other|claim -> last warning
+	brief  map[string]bool            // token id -> has seen the brief
+}
+
+// briefed marks a connection as having seen the brief; reports whether it
+// already had.
+func (c *collab) briefed(tokID string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.brief == nil {
+		c.brief = map[string]bool{}
+	}
+	had := c.brief[tokID]
+	c.brief[tokID] = true
+	return had
 }
 
 func (c *collab) push(tokID, msg string) {
@@ -157,6 +171,11 @@ func (s *Server) others(c *reqCtx) []Token {
 func (s *Server) notices(c *reqCtx, op string, paths []string) []string {
 	out := s.collab.drain(c.tok.ID)
 	project := s.Memory.Route(c.ws.ID)
+	// Agents that skip `hxoa task` still get the brief once, on their first
+	// write or command, instead of being blocked.
+	if project != "" && (writeOps[op] || op == "exec") && !s.collab.briefed(c.tok.ID) {
+		out = append(out, "你还没看过本项目的 brief (开工应先 hxoa task <号> --paths <目录>), 先读完再继续:\n"+s.Brief(c.ws, c.tok))
+	}
 	for _, p := range paths {
 		rel := strings.Trim(filepath.ToSlash(filepath.Clean("/"+p)), "/")
 		if project != "" {

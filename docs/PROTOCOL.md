@@ -39,7 +39,7 @@
 | POST `/v1/merge` | worker 模式: 把自己的分支合进用户当前分支 (同面板合并) |
 
 任何响应都可能带 `X-Hxoa-Notice`: base64 的 JSON 字符串数组 (别人的 say, 第一次碰某目录的注意事项, 写到别人认领目录的提醒), 客户端逐行以 `# ` 打到 stderr。
-`/v1/exec` 的命令里有 `git commit` 且工作区关联的记忆里有 `checks.yml` 时, 先跑覆盖到改动文件的检查, 全过才执行原命令, 否则退出码 97; `skip_check: true` 跳过并在面板标红。
+`/v1/exec` 的命令里有 `git commit` 或 `git push` 且工作区关联的记忆里有 `checks.yml` 时, 先跑覆盖到改动文件 (push 时为相对 origin/主线的改动) 的检查, 全过才执行原命令, 否则退出码 97; `skip_check: true` 跳过并在面板标红。
 
 ### patch
 

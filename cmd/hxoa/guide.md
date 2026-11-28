@@ -15,8 +15,8 @@ hxoa: 连接用户本机工作区的客户端. 路径都相对于工作区根目
                                     改到别人认领的目录, 或改了共用的东西 (协议, 常量) 时说一句
   hxoa learn '一句能判断对错的规则'   踩坑, 被主人打回时; 进收件箱, 主人采纳后进 brief
   自动的: 别人的 say, 第一次碰某个目录的注意事项, 改到别人认领目录的提醒, 都在你下一次跑 hxoa 时
-  以 "# ..." 打到 stderr, 看到就照做; git commit 前自动跑项目的 checks.yml, 不过就拒
-  (确实要跳过: hxoa git commit --skip-check ..., 面板会标红).
+  以 "# ..." 打到 stderr, 看到就照做; git commit 与 git push 前自动跑项目的 checks.yml, 不过就拒
+  (确实要跳过: hxoa git --skip-check commit ..., 面板会标红). 没登记任务就开写, 第一次写入时会补发 brief.
   hxoa brief                        再看一遍 brief     hxoa task          看当前登记
   hxoa task --clear                 做完, 或不再做了
 
