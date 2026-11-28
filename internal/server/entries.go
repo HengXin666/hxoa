@@ -158,8 +158,9 @@ func (m *Memory) Revert(sha string) error {
 var pathRefRe = regexp.MustCompile("[A-Za-z0-9_.@-]+(?:/[A-Za-z0-9_.@-]+)+")
 
 // staleRefs are paths an entry names whose first segment is a top-level
-// dir of the tree but which no longer exist there.
-func staleRefs(root, text string) []string {
+// dir of the tree but which exist neither in the worker's checkout nor on
+// the mainline (a worker behind main must not flag newer files).
+func staleRefs(root, base, text string) []string {
 	var out []string
 	for _, p := range pathRefRe.FindAllString(text, -1) {
 		p = strings.TrimRight(p, ".")
@@ -170,7 +171,7 @@ func staleRefs(root, text string) []string {
 		if st, err := os.Stat(filepath.Join(root, first)); err != nil || !st.IsDir() {
 			continue
 		}
-		if _, err := os.Stat(filepath.Join(root, p)); err != nil {
+		if _, err := os.Stat(filepath.Join(root, p)); err != nil && !onMainline(root, base, p) {
 			out = append(out, p)
 		}
 	}
@@ -179,13 +180,13 @@ func staleRefs(root, text string) []string {
 
 // annotate marks entries that point at missing paths, so the agent checks
 // and fixes them instead of trusting them.
-func annotate(root, body string) string {
+func annotate(root, base, body string) string {
 	lines := strings.Split(body, "\n")
 	for i, l := range lines {
 		if !strings.HasPrefix(l, "- ") || root == "" {
 			continue
 		}
-		if gone := staleRefs(root, l); len(gone) > 0 {
+		if gone := staleRefs(root, base, l); len(gone) > 0 {
 			lines[i] = l + "  (疑似过时: " + strings.Join(gone, ", ") + " 已不存在, 核实后 hxoa learn --fix/--drop)"
 		}
 	}
@@ -254,4 +255,17 @@ func (m *Memory) Recall(project string, words []string) []string {
 		out = append(out[:recallMax], fmt.Sprintf("... 还有 %d 条, 多加关键词缩小范围", len(out)-recallMax))
 	}
 	return out
+}
+
+// onMainline: the path exists on origin/<base> or <base>.
+func onMainline(root, base, p string) bool {
+	if base == "" {
+		return false
+	}
+	for _, ref := range []string{"origin/" + base, base} {
+		if _, err := git(root, "cat-file", "-e", ref+":"+strings.TrimSuffix(p, "/")); err == nil {
+			return true
+		}
+	}
+	return false
 }

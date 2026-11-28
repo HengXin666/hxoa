@@ -129,7 +129,7 @@ func TestMemoryInboxAndNotices(t *testing.T) {
 	if len(m.Threads("proj", 10)) != 1 {
 		t.Fatalf("threads: %v", m.Threads("proj", 10))
 	}
-	if br := s.Brief(ws, b, ""); !strings.Contains(br, "oa_1 #155 认领 client/web") || !strings.Contains(br, "主人确认过的经验") {
+	if br := s.Brief(ws, b, "", ""); !strings.Contains(br, "oa_1 #155 认领 client/web") || !strings.Contains(br, "主人确认过的经验") {
 		t.Fatalf("brief: %s", br)
 	}
 }
@@ -168,7 +168,7 @@ func TestEntriesFixDropRecallRevert(t *testing.T) {
 	os.MkdirAll(filepath.Join(root, "client", "web"), 0o700)
 	m.appendLine("proj", lessonsFile, "- 总览不放插件, 见 client/web/src/old.tsx", "t")
 	m.appendLine("proj", lessonsFile, "- 截图默认暗色", "t")
-	if got := annotate(root, m.read("proj", lessonsFile)); !strings.Contains(got, "疑似过时: client/web/src/old.tsx") || strings.Count(got, "疑似过时") != 1 {
+	if got := annotate(root, "", m.read("proj", lessonsFile)); !strings.Contains(got, "疑似过时: client/web/src/old.tsx") || strings.Count(got, "疑似过时") != 1 {
 		t.Fatalf("annotate: %s", got)
 	}
 	id := entryID("截图默认暗色")
